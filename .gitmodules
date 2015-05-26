@@ -1,0 +1,6 @@
+[submodule "arduino/i2cdevlib"]
+	path = arduino/i2cdevlib
+	url = git@github.com:jrowberg/i2cdevlib.git
+[submodule "arduino/ArduinoJson"]
+	path = arduino/ArduinoJson
+	url = git@github.com:bblanchon/ArduinoJson.git
