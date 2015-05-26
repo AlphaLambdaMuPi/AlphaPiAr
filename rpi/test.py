@@ -1,7 +1,7 @@
 import serial
 import json
 
-ser = serial.Serial('/dev/ttyAMA0', 9600, timeout=3)
+ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=3)
 
 while True:
     res = ser.readline().decode().strip('\n').strip('\r')
@@ -10,6 +10,6 @@ while True:
     except:
         print('JSON decode failed : {}'.format(res))
         continue
-    print(res)
+    print('ok', res)
     ser.write('alpha beta\n'.encode())
 
