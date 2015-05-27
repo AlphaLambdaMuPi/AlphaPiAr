@@ -14,26 +14,27 @@ HMC5883L hmc5883l;
 BMP085 bmp085;
 Measure meas;
 int64_t lastMicros = 0;
-SoftwareSerial piSerial(10, 11);
+/* SoftwareSerial piSerial(10, 11); */
+#define piSerial Serial
 char indata[100];
 float testval;
 
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(115200);
-  piSerial.begin(9600);
+  /* Serial.begin(115200); */
+  piSerial.begin(115200);
   Wire.begin();
   mpu6050.initialize();
-  Serial.println(mpu6050.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+  /* Serial.println(mpu6050.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed"); */
   
   mpu6050.setI2CBypassEnabled(true);
   mpu6050.setI2CMasterModeEnabled(false);
 
   hmc5883l.initialize();
-  Serial.println(hmc5883l.testConnection() ? "HMC5883L connection successful" : "HMC5883L connection failed");
+  /* Serial.println(hmc5883l.testConnection() ? "HMC5883L connection successful" : "HMC5883L connection failed"); */
 
   bmp085.initialize();
-  Serial.println(bmp085.testConnection() ? "BMP085 connection successful" : "BMP085 connection failed");
+  /* Serial.println(bmp085.testConnection() ? "BMP085 connection successful" : "BMP085 connection failed"); */
 
   bmp085.setControl(BMP085_MODE_TEMPERATURE);
 
@@ -83,13 +84,11 @@ void read_json()
   if(piSerial.available() == 0)
     return;
   int pos = 0;
-  int cnt = 0;
   while(piSerial.available() > 0)
   {
     int c = piSerial.read();
-    piSerial.print((unsigned int8_t)(c));
-    piSerial.print(",");
-    cnt += 1;
+    /* piSerial.print((unsigned int8_t)(c)); */
+    /* piSerial.print(","); */
     indata[pos] = c;
     pos += 1;
     if(c == '\n' || piSerial.available() <= 0)
@@ -99,9 +98,10 @@ void read_json()
     }
   }
 
-  piSerial.println("");
-  piSerial.println(cnt);
-  /* piSerial.println(indata); */
+  /* piSerial.println(""); */
+  /* piSerial.println(cnt); */
+  piSerial.print("Data : ");
+  piSerial.println(indata);
 
 }
 
