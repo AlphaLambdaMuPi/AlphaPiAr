@@ -6,18 +6,21 @@
 #include "HMC5883L.h"
 #include "BMP085.h"
 #include "ArduinoJson.h"
-
-int N_SAMPLE = 1;
+#include "Servo.h"
 
 MPU6050 mpu6050;
 HMC5883L hmc5883l;
 BMP085 bmp085;
 Measure meas;
+Servo servo[4];
+const int SERVO_PIN[4] = {9, 10, 11, 12};
 int64_t lastMicros = 0;
+double global_time_offset = 0;
 /* SoftwareSerial piSerial(10, 11); */
 #define piSerial Serial
-char indata[100];
-float testval;
+char indata[256];
+int motor[4];
+int pos;
 
 void setup() {
   // put your setup code here, to run once:
@@ -38,6 +41,16 @@ void setup() {
 
   bmp085.setControl(BMP085_MODE_TEMPERATURE);
 
+  for(int i=0; i<4; i++)
+  {
+    servo[i].attach(SERVO_PIN[i]);
+    servo[i].writeMicroseconds(0);
+  }
+}
+
+double gettime()
+{
+  return global_time_offset + micros() * 1E-6;
 }
 
 Measure& read_data() {
@@ -83,33 +96,63 @@ void read_json()
 {
   if(piSerial.available() == 0)
     return;
-  int pos = 0;
+  int cnt = 0;
   while(piSerial.available() > 0)
   {
+    cnt++;
     int c = piSerial.read();
-    /* piSerial.print((unsigned int8_t)(c)); */
-    /* piSerial.print(","); */
     indata[pos] = c;
     pos += 1;
-    if(c == '\n' || piSerial.available() <= 0)
+    if(c == '\n')
     {
       indata[pos-1] = '\0';
       pos = 0;
     }
   }
 
-  /* piSerial.println(""); */
-  /* piSerial.println(cnt); */
-  piSerial.print("Data : ");
-  piSerial.println(indata);
+  if(pos > 0) return;
 
+  /* piSerial.print("Total Cnt = "); */
+  /* piSerial.println(cnt); */
+  /* piSerial.print("Raw data = "); */
+  /* piSerial.println(indata); */
+
+  piSerial.println(indata);
+  piSerial.flush();
+
+  //Parse Json
+  StaticJsonBuffer<256> jsonBuffer;
+  JsonObject& root = jsonBuffer.parseObject(indata);
+  if(!root.success()) return;
+  if(!root.containsKey("motor")) return;
+  if(!root["motor"].is<JsonArray&>()) return;
+  JsonArray& marr = root["motor"];
+  for(int i=0; i<4; i++)
+    motor[i] = marr[i];
+  
+  /* for(int i=0; i<4; i++) */
+  /* { */
+    /* piSerial.print(motor[i]); */
+    /* piSerial.print(","); */
+  /* } */
+  /* piSerial.println(""); */
+  /* piSerial.flush(); */
+}
+
+void set_motor()
+{
+  for(int i=0; i<4; i++)
+  {
+    servo[i].writeMicroseconds(motor[i]);
+  }
 }
 
 void print_json(Measure &meas)
 {
   StaticJsonBuffer<256> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
-  root["time"] = micros();
+  root["time"].set(gettime(), 6);
+  root["timez"].set(global_time_offset, 6);
 
   JsonArray& arr_acc = root.createNestedArray("accel");
   arr_acc.add(meas.accel.x, 3);
@@ -130,15 +173,15 @@ void print_json(Measure &meas)
   root["pressure"].set(meas.pressure, 0);
 
   root.printTo(piSerial);
-  /* piSerial.print(micros()); */
   piSerial.println("");
+  
+  piSerial.flush();
 }
 
 void print_data(Measure &meas)
 {
-
   Serial.print(F("Time : "));
-  Serial.print(micros());
+  Serial.print(gettime(), 6);
   Serial.println(F(""));
 
   Serial.print(F("accel : "));
@@ -174,20 +217,12 @@ void print_data(Measure &meas)
   Serial.println(F(""));
 }
 
-int scnt = 0;
-Measure ms;
 void loop()
 {
-  piSerial.println("\"A\"");
   read_json();
-  ms += read_data();
-  scnt++;
-  if(scnt == N_SAMPLE)
-  {
-    scnt = 0;
-    ms *= 1.0 / N_SAMPLE;
-    /* print_json(ms); */
-    ms = Measure();
-    delay(1000);
-  }
+  set_motor();
+  Measure ms = read_data();
+  print_json(ms);
+  ms = Measure();
+  /* delay(1000); */
 }
