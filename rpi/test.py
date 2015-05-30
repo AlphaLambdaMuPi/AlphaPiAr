@@ -34,11 +34,11 @@ def serial_reading(arr):
 
 def reading_from_stdin(arr):
     while True:
-        inp = input()
-        mt = int(inp)
+        inp = input().split()
+        mt = [int(x) for x in inp]
         for i in range(4):
-            arr[i] = mt
-        print("-- Set Motor", mt)
+            arr[i] = mt[i]
+        # print("-- Set Motor", mt)
 
 if __name__ == "__main__":
     arr = Array('i', [0]*4)
