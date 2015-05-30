@@ -27,7 +27,8 @@ def start_control(client):
     yield from client._connected
     if not client._connected.result():
         return
-    loop = asyncio.get_event_loop()
+    data = {'role': 'DRONE', 'name': 'TEST_RPI_DRONE'}
+    client.send(data)
     p = yield from asyncio.create_subprocess_shell(
         'python test.py',
         stdin=asyncio.subprocess.PIPE,
