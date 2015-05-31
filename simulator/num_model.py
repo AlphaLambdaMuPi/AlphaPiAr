@@ -13,6 +13,10 @@ class Drone:
         self.I = np.diag([self.Ixy, self.Ixy, self.Iz])
         self.LIFT_K = 0.01
         self.TDRAG_K = 0
+        self.DRAG_B = 0.5
+
+        self.noise_acc = 0.07
+        self.noise_omega = 0.02
 
         self.pos = np.eye(4)
         self.vel = np.zeros(3)
@@ -66,7 +70,7 @@ class Drone:
         lifts = [self.lift(x) for x in pomega]
         force_int = self.force(lifts)
         torque_int = self.torque(lifts, pomega)
-        force_ref = np.dot(rot, force_int) + self.M * self.gvec
+        force_ref = np.dot(rot, force_int) + self.M * self.gvec - self.DRAG_B * self.vel
         torque_ref = np.dot(rot, torque_int)
         I_ref = np.dot(rot, self.I)
         omega_ref = self.omega
@@ -88,7 +92,9 @@ class Drone:
         return self.time
 
     def get_sensors(self):
-        return self.acc_sensor, np.dot(np.linalg.inv(self.rot()), self.omega)
+        acc = self.acc_sensor + np.random.normal(scale=self.noise_acc)
+        omega = np.dot(np.linalg.inv(self.rot()), self.omega) + np.random.normal(scale=self.noise_omega)
+        return acc, omega
 
     def get_position(self):
         return self.pos[:3, 3]
