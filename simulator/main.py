@@ -8,20 +8,20 @@ from num_model import Drone
 np.set_printoptions(precision=4, suppress=True)
 
 def get_pid1():
-    KPxy = 2
-    KPz = 2
-    KPt = 1
+    KPxy = 0.1
+    KPz = 0.1
+    KPt = 0.1
     kp = np.vstack([np.diag([KPxy, KPxy, KPz]), np.zeros((3, 3))])
     kd = np.array([1.0]*3 + [1.2]*3)[np.newaxis].T * kp
-    ki = -0.1 * kp
+    ki = -0.0 * kp
     ke = 0.9
     controller = PIDController(kp, kd, ki, ke)
     return controller
 
 def get_pid2():
-    KPxy = 15
-    KPz = 15
-    KPw = 5
+    KPxy = 15.
+    KPz = 15.
+    KPw = 5.
     kpw1 = [KPxy, KPxy, KPz, KPw, -KPw, KPw]
     kpw2 = [KPxy, -KPxy, KPz, -KPw, -KPw, -KPw]
     kpw3 = [-KPxy, -KPxy, KPz, -KPw, KPw, KPw]
@@ -34,15 +34,16 @@ def get_pid2():
     return controller
 
 def simulate(drone):
-    last_time = 0
+    last_time = 0.
     G = drone.g
     ctl1 = get_pid1()
     ctl2 = get_pid2()
-    DES = np.array([0, 0, 0])
-    action = np.array([0.0] * 4)
+    DES = np.array([0., 0., 0.])
+    action = np.array([0.] * 4)
+    DTIME = 20e-3
     while True:
         drone.step()
-        if drone.get_time() - last_time > 5e-3:
+        if drone.get_time() - last_time > DTIME:
             dt = drone.get_time() - last_time
             last_time = drone.get_time()
 
@@ -67,7 +68,7 @@ def simulate(drone):
 
 def main():
     drone = Drone()
-    drone.set_init([0, 0, 0], [2, 2, 0])
+    drone.set_init([0., 0., 0.], [2., 2., 0.])
     # drone.noise_acc = 1e-10
     # drone.noise_omega = 1e-10
     try:

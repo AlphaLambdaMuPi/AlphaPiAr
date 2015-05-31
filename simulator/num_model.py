@@ -48,17 +48,17 @@ class Drone:
             [-wy, wx, 0.],
         ])
         return np.eye(3) + np.sin(th) * K + (1. - np.cos(th)) * np.dot(K, K)
-        # return scipy.linalg.expm(K*th)
+            # Rodrigue's formula; equivalent to exponential map exp(th*K)
 
     def lift(self, pomega):
         return self.LIFT_K * pomega
 
-    def force(self, lifts):
+    def force(self, lifts): # internal frame
         f = np.array([0., 0., sum(lifts)])
         f -= self.DRAG_B * np.dot(self.invrot(), self.vel)
         return f
 
-    def torque(self, lifts, pomega):
+    def torque(self, lifts, pomega): # internal frame
         tau = np.zeros(3)
         for i in range(4):
             lf = np.array([0., 0., lifts[i]])
@@ -86,7 +86,7 @@ class Drone:
             torque_ref - np.cross(omega_ref, np.dot(I_ref, omega_ref))
         )
 
-        dmx = self.diff_matrix(self.omega + rotacc_ref * self.dt / 2. * 0., self.dt)
+        dmx = self.diff_matrix(self.omega + rotacc_ref * self.dt / 2., self.dt)
         self.rot = np.dot(dmx, self.rot)
         self.pos += self.vel * self.dt + acc_ref * self.dt**2 / 2.
         self.vel += acc_ref * self.dt
