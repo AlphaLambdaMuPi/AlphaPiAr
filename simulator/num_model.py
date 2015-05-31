@@ -2,15 +2,15 @@ import numpy as np
 
 class Drone:
     def __init__(self):
-        self.dt = 1E-6
-        self.time = 0
+        self.dt = 1E-5
+        self.time = 0.0
         self.g = 9.80
         self.gvec = np.array([0, 0, -self.g])
         self.M = 1.250
         self.R = 0.23
         self.Iz = 0.25 * self.M * self.R**2
         self.Ixy = self.Iz * 0.5
-        self.I = np.diag([self.Iz, self.Ixy, self.Ixy])
+        self.I = np.diag([self.Ixy, self.Ixy, self.Iz])
         self.LIFT_K = 0.01
         self.TDRAG_K = 0
 
@@ -39,7 +39,7 @@ class Drone:
             [1, -wz, wy, vx], 
             [wz, 1, -wx, vy], 
             [-wy, wx, 1, vz],
-            [0, 0, 0, 1],
+            [0, 0, 0, 1.],
         ])
         return ret
 
@@ -82,6 +82,7 @@ class Drone:
         self.pos = np.dot(dmx, self.pos)
         self.vel += acc_ref * self.dt
         self.omega += rotacc_ref * self.dt
+        self.time += self.dt
 
     def get_time(self):
         return self.time
@@ -91,6 +92,13 @@ class Drone:
 
     def get_position(self):
         return self.pos[:3, 3]
+
+    def get_orientation(self):
+        return np.dot(self.rot(), np.array([0, 0, 1.0]))
+    
+    def set_init(self, vel, omega):
+        self.vel = np.array(vel, dtype=np.float64)
+        self.omega = np.array(omega, dtype=np.float64)
 
 if __name__ == '__main__':
     drone = Drone()
