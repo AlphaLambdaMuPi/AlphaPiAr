@@ -18,6 +18,7 @@ class Drone:
 
         self.noise_acc = 0.07
         self.noise_omega = 0.02
+        self.noise_z = 0.5
 
         self.pos = np.zeros(3)
         self.rot = np.eye(3)
@@ -99,14 +100,15 @@ class Drone:
     def get_sensors(self):
         acc = self.acc_sensor + np.random.normal(scale=self.noise_acc)
         omega = np.dot(self.invrot(), self.omega) + np.random.normal(scale=self.noise_omega)
-        return acc, omega
+        z = self.pos[2] + np.random.normal(scale=self.noise_z)
+        return acc, omega, z
 
     def get_position(self):
         return self.pos
 
     def get_orientation(self):
         return np.dot(self.rot, np.array([0., 0., 1.]))
-    
+
     def set_init(self, vel, omega):
         self.vel = np.array(vel, dtype=np.float64)
         self.omega = np.array(omega, dtype=np.float64)
