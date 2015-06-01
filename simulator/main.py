@@ -8,12 +8,12 @@ from num_model import Drone
 np.set_printoptions(precision=4, suppress=True)
 
 def get_pid1():
-    KPxy = 0.1
-    KPz = 0.1
-    KPt = 0.1
-    kp = np.vstack([np.diag([KPxy, KPxy, KPz]), np.zeros((3, 3))])
-    kd = np.array([1.0]*3 + [1.2]*3)[np.newaxis].T * kp
-    ki = -0.0 * kp
+    KPxy = 0
+    KPz = 0
+    KPt = 1
+    kp = np.vstack([np.diag([-KPxy, -KPxy, KPz]), np.zeros((3, 3))])
+    kd = np.array([0.5]*3 + [1.2]*3)[np.newaxis].T * kp
+    ki = -0.3 * kp
     ke = 0.9
     controller = PIDController(kp, kd, ki, ke)
     return controller
@@ -53,10 +53,12 @@ def simulate(drone):
             uacc[2] += G
             u = ctl2.get_control(last_time, dt, meas, uacc)
             action += u
+            action = np.maximum.reduce([action, np.zeros(4)])
             drone.set_motors(action)
 
             ori = drone.get_orientation()
             print('update motors: {}'.format(u))
+            print('update target: {}'.format(uacc))
             print('action: {}'.format(action))
             print('time: {}'.format(last_time))
             print('pos : {}'.format(pos))
