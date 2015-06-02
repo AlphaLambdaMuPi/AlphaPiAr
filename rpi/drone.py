@@ -5,6 +5,7 @@ import logging
 from collections import namedtuple
 
 from client import Client
+from pid import PIDController
 
 Server = namedtuple('Server', 'ip port')
 
@@ -22,6 +23,38 @@ def log_setup():
 log_setup()
 logger = logging.getLogger()
 
+def get_pid1():
+    KPxy = 0.
+    KPz = 0.
+    KPt = 1.
+    kp = np.vstack([np.diag([-KPxy, -KPxy, KPz]), np.zeros((3, 3))])
+    kd = np.array([1.2]*3 + [0.05]*3)[np.newaxis].T * kp
+    ki = 0.1 * kp
+    ke = 0.9
+    controller = PIDController(kp, kd, ki, ke)
+    return controller
+
+def get_pid2():
+    KPxy = 5.
+    KPz = 10.
+    KPw = 10.
+    # KPxy = 0.
+    # KPz = 0.
+    # KPw = 0.
+    kpw1 = [KPxy, KPxy, KPz, KPw, -KPw, KPw]
+    kpw2 = [KPxy, -KPxy, KPz, -KPw, -KPw, -KPw]
+    kpw3 = [-KPxy, -KPxy, KPz, -KPw, KPw, KPw]
+    kpw4 = [-KPxy, KPxy, KPz, KPw, KPw, -KPw]
+    kp = np.array([kpw1, kpw2, kpw3, kpw4])
+    kd = np.array([0.025]*3 + [0.02]*3) * kp
+    ki = np.array([1/4]*3 + [1/8]*3) * kp
+    ke = 0.9
+    controller = PIDController(kp, kd, ki, ke)
+    return controller
+
+ctl1 = get_pid1()
+ctl2 = get_pid2()
+
 @asyncio.coroutine
 def start_control(client):
     yield from client._connected
@@ -30,7 +63,7 @@ def start_control(client):
     data = {'role': 'DRONE', 'name': 'TEST_RPI_DRONE'}
     client.send(data)
     p = yield from asyncio.create_subprocess_shell(
-        'python test.py',
+        'python arduino.py',
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
     )
@@ -39,7 +72,7 @@ def start_control(client):
     while client._connected.result() and not client._closed:
         data = yield from client.recv()
         # parse four number for motors control
-        motorcmd = ' '.join(data)
+        despos = np.array(data)
         writer.write(motorcmd.encode())
 
     print("connection closed.")

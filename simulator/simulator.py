@@ -8,13 +8,11 @@ from num_model import Drone
 
 np.set_printoptions(precision=4, suppress=True)
 
-def get_pid1():
-    KPxy = 0.
-    KPz = 1.
+    KPxy = 0.2
+    KPz = 0.8
     KPt = 1.
     kp = np.vstack([np.diag([-KPxy, -KPxy, KPz]), np.zeros((3, 3))])
-    kd = np.array([1.]*3 + [0.05]*3)[np.newaxis].T * kp
-    # kd[2] = 2 * np.sqrt(kp[2])
+    kd = np.array([1.2]*3 + [0.05]*3)[np.newaxis].T * kp
     ki = 0.1 * kp
     ke = 0.9
     controller = PIDController(kp, kd, ki, ke)
@@ -41,7 +39,7 @@ def get_pid2():
 class Simulator:
     def __init__(self):
         self.drone = Drone()
-        self.drone.set_init([0., 0., 0.], [2., 2., 2.])
+        self.drone.set_init([0., 0., 0.], [2., 2., 0.])
         self.drone.dt = 5e-4
         # self.drone.noise_z = 1e-10
 
@@ -51,7 +49,7 @@ class Simulator:
         G = self.drone.g
         ctl1 = get_pid1()
         ctl2 = get_pid2()
-        DES = np.array([0., 0., 0.])
+        DES = np.array([2., 0., 2.])
         action = np.array([0.] * 4)
         DTIME = 20e-3
 
@@ -65,7 +63,8 @@ class Simulator:
 
                 acc, omega, z = self.drone.get_sensors()
                 zmm = zmm * alpha + (1-alpha) * z
-                pos = np.array([0, 0, zmm])
+                pos = self.drone.get_position()
+                pos = np.array([pos[0], pos[1], zmm])
                 uacc = ctl1.get_control(last_time, dt, pos, DES)
                 # uacc[0] += 1
                 # uacc[2] += np.sqrt(G**2 - 1)
