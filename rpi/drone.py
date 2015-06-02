@@ -51,6 +51,9 @@ class Drone:
         self.omega0 = omegas / TEST_COUNT
         self.p0 = pressures / TEST_COUNT
         logger.debug('Self test completed.')
+        logger.debug('acc0 : {}'.format(self.acc0))
+        logger.debug('omega0 : {}'.format(self.omega0))
+        logger.debug('p0 : {}'.format(self.p0))
 
         self._worker = self.loop.create_task(self._run())
         self.ready.set_result(True)
@@ -61,7 +64,7 @@ class Drone:
         return self.ready.result()
 
     def set_motors(self,motorcmd):
-        motorcmd = map(int, np.min(motorcmd+1200, 1700))
+        motorcmd = map(int, np.minimum(motorcmd+1200, 1700))
         self.writer.write((' '.join(map(str, motorcmd)) + '\n').encode())
 
     def getacc(self):
@@ -83,7 +86,8 @@ class Drone:
                 data = yield from self.reader.readline()
                 self.data = json.loads(data.decode())
             except Exception as epsilon:
-                print(epsilon)
+                print('Epsilon', epsilon)
+                yield from asyncio.sleep(0.2)
 
 rpi_drone = Drone()
 

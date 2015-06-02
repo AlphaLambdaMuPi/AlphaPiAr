@@ -74,13 +74,14 @@ def start_control():
             last_time = time.time()
             acc, omega, z = rpi_drone.get_sensors()
 
+            pos = np.array([0., 0., 0.])
             uacc = ctl1.get_control(last_time, dt, pos, despos)
             uacc[2] += G
             meas = np.array((acc, omega)).flatten()
             u = ctl2.get_control(last_time, dt, meas, uacc)
             action += u
             action = np.maximum.reduce([action, np.zeros(4)])
-            self.drone.set_motors(action)
+            rpi_drone.set_motors(action)
         except KeyboardInterrupt:
             break
     while sum(action) > 0.:
