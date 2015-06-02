@@ -30,12 +30,14 @@ def read_from_stdin(client):
     reader_protocol = asyncio.StreamReaderProtocol(reader)
     yield from loop.connect_read_pipe(lambda: reader_protocol, sys.stdin)
     print("Enter control name:", end='', flush=True)
-    data = yield from reader.readline()
-    data = {'role': 'CONTROL', 'name': data.decode()}
+    data = (yield from reader.readline()).decode().strip()
+    data = {'role': 'CONTROL', 'name': data}
     client.send(data)
+    target_list = yield from client.recv()
+    print(target_list)
     print("Enter drone name:", end='', flush=True)
-    data = yield from reader.readline()
-    data = {'target': data.decode()}
+    data = (yield from reader.readline()).decode().strip()
+    data = {'target': data}
     client.send(data)
     print("Enter your motors command (four number each command):")
     while client._connected.result() and not client._closed:
