@@ -51,14 +51,16 @@ def get_command(client):
     while client._connected.result() and not client._closed:
         data = yield from client.recv()
         # parse four number for motors control
-        if data == 1:
-            controller.offset = 0.1
-        elif data == 2:
-            controller.offset = 0.
-        elif data == 3:
-            controller.offset = -0.1
-        elif data == 0:
-            controller.stop()
+        if not controller.stop_signal.done():
+            if data == 1:
+                controller.offset = 0.1
+            elif data == 2:
+                controller.offset = 0.
+            elif data == 3:
+                controller.offset = -0.1
+            elif data == 0:
+                controller.stop()
+            logger.debug("current target g: {}".format(controller.offset + controller.drone.g))
 
     logger.debug("control connection closed.")
 

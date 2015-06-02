@@ -22,7 +22,8 @@ class StreamConnection:
         while self.alive():
             try:
                 data = yield from self._sr.readline()
-                if data and len(data):
+                data.strip()
+                if data:
                     self._msgs.put_nowait(self._convert(data))
             except asyncio.CancelledError:
                 logger.debug("readline from stream reader was cancelled.")
@@ -32,7 +33,7 @@ class StreamConnection:
         logger.debug("connection closed")
 
     def _convert(self, data):
-        return data.strip()
+        return data
 
     @asyncio.coroutine
     def recv(self):

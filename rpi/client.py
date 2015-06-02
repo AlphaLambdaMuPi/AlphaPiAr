@@ -52,7 +52,7 @@ class Client:
         yield from self._connected
         if not self._connected.result():
             return
-        yield from self._conn.recv()
+        return (yield from self._conn.recv())
 
     def send(self, data):
         if self._connected.done():

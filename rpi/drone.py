@@ -89,9 +89,13 @@ class Drone:
         while True:
             try:
                 data = yield from self.reader.readline()
-                self.data = json.loads(data.decode())
+                tmp = json.loads(data.decode())
+                if tmp['pressure'] < 90000:
+                    continue
+                self.data = tmp
             except Exception as epsilon:
                 print('Epsilon', epsilon)
+                print('Data : ', data)
                 yield from asyncio.sleep(0.2)
 
 rpi_drone = Drone()
