@@ -4,6 +4,7 @@ import asyncio
 import logging
 from collections import namedtuple
 import time
+import numpy as np
 
 from logsetting import log_setup
 from client import Client
@@ -52,12 +53,12 @@ def start_control():
     ctl1 = get_pid1()
     ctl2 = get_pid2()
 
-    yield from rpi_drone.connect()
+    yield from rpi_drone.start_control()
     ready = yield from rpi_drone.get_ready()
     if not ready:
         return
 
-    G = self.drone.g
+    G = rpi_drone.g
     logger.info('detect G: {}'.format(G))
     ctl1 = get_pid1()
     ctl2 = get_pid2()
