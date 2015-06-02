@@ -16,8 +16,8 @@ class Drone:
         self.TDRAG_K = 0.0
         self.DRAG_B = 0.5
 
-        self.noise_acc = 0.07
-        self.noise_omega = 0.02
+        self.noise_acc = 0.04
+        self.noise_omega = 0.002
         self.noise_z = 0.5
 
         self.pos = np.zeros(3)
