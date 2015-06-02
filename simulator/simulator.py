@@ -8,6 +8,7 @@ from num_model import Drone
 
 np.set_printoptions(precision=4, suppress=True)
 
+def get_pid1():
     KPxy = 0.2
     KPz = 0.8
     KPt = 1.
@@ -66,8 +67,6 @@ class Simulator:
                 pos = self.drone.get_position()
                 pos = np.array([pos[0], pos[1], zmm])
                 uacc = ctl1.get_control(last_time, dt, pos, DES)
-                # uacc[0] += 1
-                # uacc[2] += np.sqrt(G**2 - 1)
                 uacc[2] += G
                 meas = np.array((acc, omega)).flatten()
                 u = ctl2.get_control(last_time, dt, meas, uacc)
