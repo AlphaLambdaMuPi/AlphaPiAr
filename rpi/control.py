@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import sys
 from collections import namedtuple
 
 from client import Client
@@ -28,13 +29,13 @@ def read_from_stdin(client):
     reader = asyncio.StreamReader()
     reader_protocol = asyncio.StreamReaderProtocol(reader)
     yield from loop.connect_read_pipe(lambda: reader_protocol, sys.stdin)
-    print("Enter control name:", end='')
+    print("Enter control name:", end='', flush=True)
     data = yield from reader.readline()
-    data = {'role': 'CONTROL', 'name': data}
+    data = {'role': 'CONTROL', 'name': data.decode()}
     client.send(data)
-    print("Enter drone name:", end='')
+    print("Enter drone name:", end='', flush=True)
     data = yield from reader.readline()
-    data = {'target': data}
+    data = {'target': data.decode()}
     client.send(data)
     print("Enter your motors command (four number each command):")
     while client._connected.result() and not client._closed:
