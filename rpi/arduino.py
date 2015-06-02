@@ -19,11 +19,10 @@ def serial_reading(arr):
             # print('JSON decode failed : {}'.format(res))
             continue
 
-        if cnt % 50 == 0:
-            print(res)
-
         if 'accel' not in res:
             continue
+
+        print(json.dumps(res))
 
         cnt += 1
 

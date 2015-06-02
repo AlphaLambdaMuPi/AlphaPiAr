@@ -2,95 +2,79 @@
 
 import asyncio
 import logging
-from collections import namedtuple
 
-from client import Client
-from pid import PIDController
-
-Server = namedtuple('Server', 'ip port')
-
-def log_setup():
-    async_logger = logging.getLogger("asyncio")
-    # async_logger.setLevel(logging.WARNING)
-    async_logger.setLevel(logging.DEBUG)
-
-    FORMAT = "%(asctime)s [%(module)s] [%(levelname)-5.5s] - %(message)s"
-
-    logFormatter = logging.Formatter(FORMAT)
-
-    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
-
-log_setup()
 logger = logging.getLogger()
 
-def get_pid1():
-    KPxy = 0.
-    KPz = 0.
-    KPt = 1.
-    kp = np.vstack([np.diag([-KPxy, -KPxy, KPz]), np.zeros((3, 3))])
-    kd = np.array([1.2]*3 + [0.05]*3)[np.newaxis].T * kp
-    ki = 0.1 * kp
-    ke = 0.9
-    controller = PIDController(kp, kd, ki, ke)
-    return controller
+class Drone:
+    def __init__(self):
+        self.loop = asyncio.get_event_loop()
+        self.ready = asyncio.Future(loop=self.loop)
 
-def get_pid2():
-    KPxy = 5.
-    KPz = 10.
-    KPw = 10.
-    # KPxy = 0.
-    # KPz = 0.
-    # KPw = 0.
-    kpw1 = [KPxy, KPxy, KPz, KPw, -KPw, KPw]
-    kpw2 = [KPxy, -KPxy, KPz, -KPw, -KPw, -KPw]
-    kpw3 = [-KPxy, -KPxy, KPz, -KPw, KPw, KPw]
-    kpw4 = [-KPxy, KPxy, KPz, KPw, KPw, -KPw]
-    kp = np.array([kpw1, kpw2, kpw3, kpw4])
-    kd = np.array([0.025]*3 + [0.02]*3) * kp
-    ki = np.array([1/4]*3 + [1/8]*3) * kp
-    ke = 0.9
-    controller = PIDController(kp, kd, ki, ke)
-    return controller
+    @asyncio.coroutine
+    def start_control(self):
+        self.p = yield from asyncio.create_subprocess_shell(
+            'python arduino.py',
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+        )
+        self.reader = self.p.stdout
+        self.writer = self.p.stdin
+        self._worker = self.loop.create_task(self._run())
 
-ctl1 = get_pid1()
-ctl2 = get_pid2()
+        TEST_COUNT = 250
+        t = 0
+        accs = np.zeros(3)
+        omegas = np.zeros(3)
+        pressures = np.zeros(1)
+        for i in range(5):
+            s = yield from self.reader.readline()
+        while t < TEST_COUNT:
+            s = yield from self.reader.readline()
+            t += 1
+            dt = json.loads(s.decode())
+            acc = dt['accel']
+            omega = dt['gyro']
+            pressure = dt['pressure']
 
-@asyncio.coroutine
-def start_control(client):
-    yield from client._connected
-    if not client._connected.result():
-        return
-    data = {'role': 'DRONE', 'name': 'TEST_RPI_DRONE'}
-    client.send(data)
-    p = yield from asyncio.create_subprocess_shell(
-        'python arduino.py',
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-    )
-    reader = p.stdout
-    writer = p.stdin
-    while client._connected.result() and not client._closed:
-        data = yield from client.recv()
-        # parse four number for motors control
-        despos = np.array(data)
-        writer.write(motorcmd.encode())
+            accs += np.array(acc)
+            omegas += np.array(omega)
+            pressures += np.array(pressure)
 
-    print("connection closed.")
+        self.acc0 = accs / TEST_COUNT
+        self.omega0 = omegas / TEST_COUNT
+        self.p0 = pressures / TEST_COUNT
 
-def main():
-    loop = asyncio.get_event_loop()
-    s = Server('140.112.18.210', 12345)
-    cc = Client(s)
-    loop.run_until_complete(cc.connect())
-    loop.create_task(start_control(cc))
-    try:
-        loop.run_forever()
-    except KeyboardInterrupt:
-        loop.run_until_complete(cc.close())
-        print('exit.')
-    finally:
-        loop.close()
+        self.ready.set_result(True)
 
-if __name__ == "__main__":
-    main()
+    @asyncio.coroutine
+    def get_ready(self):
+        yield from self.ready
+        return self.ready.result()
+
+    def set_motors(self,motorcmd):
+        motorcmd = map(int, np.min(motorcmd+1200, 1700))
+        self.writer.write((' '.join(map(str, motorcmd)) + '\n').encode())
+
+    def getacc(self):
+        return dt['accel'] - self.acc0
+
+    def getomega(self):
+        return dt['gyro'] - self.omega0
+
+    def getz(self):
+        return (self.p0 - self.data['pressure']) * 0.083
+
+    def get_sensors(self):
+        return self.getacc(), self.getomega(), self.getz()
+
+    @asyncio.coroutine
+    def _run(self):
+        while True:
+            try:
+                data = yield from self.reader.readline()
+                self.data = json.loads(data.decode())
+            except:
+                print('ConConCon')
+
+rpi_drone = Drone()
 
