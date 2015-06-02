@@ -41,6 +41,7 @@ class Drone:
             pressures += np.array(pressure)
 
         self.acc0 = accs / TEST_COUNT
+        self.acc0[2] -= 9.80
         self.omega0 = omegas / TEST_COUNT
         self.p0 = pressures / TEST_COUNT
 
