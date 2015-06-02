@@ -22,18 +22,29 @@ class Client:
 
     @asyncio.coroutine
     def connect(self):
+        @asyncio.coroutine
+        def _connect():
+            while not self._connected.done():
+                try:
+                    sr, sw = yield from asyncio.open_connection(
+                        self._server.ip,
+                        self._server.port,
+                        loop=self._loop
+                    )
+                    self._conn = JsonConnection(sr, sw, loop=self._loop)
+                    return
+                except ConnectionError:
+                    logger.debug('connection failed')
+                    yield from asyncio.sleep(10)
+
         try:
-            sr, sw = yield from asyncio.open_connection(
-                self._server.ip,
-                self._server.port,
-                loop=self._loop
-            )
-            self._conn = JsonConnection(sr, sw, loop=self._loop)
-        except ConnectionError:
-            logger.debug('connection failed')
+            yield from _connect()
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            logger.debug('connection was cancelled')
             self._connected.set_result(False)
             return
-        logger.debug('connection made')
+
+        logger.debug('connection was made')
         self._connected.set_result(True)
 
     @asyncio.coroutine

@@ -10,8 +10,8 @@ Server = namedtuple('Server', 'ip port')
 
 def log_setup():
     async_logger = logging.getLogger("asyncio")
-    # async_logger.setLevel(logging.WARNING)
-    async_logger.setLevel(logging.DEBUG)
+    async_logger.setLevel(logging.WARNING)
+    # async_logger.setLevel(logging.DEBUG)
 
     FORMAT = "%(asctime)s [%(module)s] [%(levelname)-5.5s] - %(message)s"
 
@@ -41,8 +41,11 @@ def read_from_stdin(client):
         data = yield from reader.readline()
         data = data.decode()
         # parse four number for motors control
-        motors = [int(x) for x in data.split()]
-        client.send(motors)
+        try:
+            cmd = int(data)
+        except ValueError:
+            cmd = 0
+        client.send(cmd)
 
     print("connection closed.")
 

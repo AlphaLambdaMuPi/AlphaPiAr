@@ -2,7 +2,7 @@
 
 import numpy as np
 
-class PIDController:
+class PID:
     def __init__(self, kp, kd, ki, ke):
         self._kp = kp
         self._kd = kd
