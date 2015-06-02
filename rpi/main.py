@@ -36,15 +36,21 @@ def get_command(client):
     client.send(data)
 
     ready = yield from rpi_drone.get_ready()
+
+    logger.debug("drone ready")
+
     data = {'status': ready}
     client.send(data)
+
 
     if not ready:
         client.close()
         return
+    
 
     while client._connected.result() and not client._closed:
         data = yield from client.recv()
+        # parse four number for motors control
         if data == 1:
             controller.offset = 0.1
         elif data == 2:
@@ -53,11 +59,6 @@ def get_command(client):
             controller.offset = -0.1
         elif data == 0:
             controller.stop()
-
-        # parse four number for motors control
-        if data.get('cmd', None):
-            pass
-            # controller.set_despos(np.array(data['despos']))
 
     logger.debug("control connection closed.")
 

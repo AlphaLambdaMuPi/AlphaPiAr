@@ -81,10 +81,10 @@ class Controller:
         acc, omega, z = self.drone.get_sensors()
 
         pos = np.array([0., 0., 0.])
-        uacc = ctl1.get_control(last_time, dt, pos, despos)
+        uacc = self.ctl1.get_control(now, dt, pos, self.despos)
         uacc[2] += self.drone.g + self.offset # testing purpose
         meas = np.array((acc, omega)).flatten()
-        u = ctl2.get_control(now, dt, meas, uacc)
+        u = self.ctl2.get_control(now, dt, meas, uacc)
         self.action += u
         self.action = np.maximum.reduce([self.action, np.zeros(4)])
         self.drone.set_motors(self.action)
