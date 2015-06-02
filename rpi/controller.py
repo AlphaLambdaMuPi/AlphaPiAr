@@ -74,7 +74,7 @@ class Controller:
             yield from asyncio.sleep(DTIME)
             self.update()
 
-    def udpate(self):
+    def update(self):
         now = self.loop.time()
         dt = now - self.last_time
 
