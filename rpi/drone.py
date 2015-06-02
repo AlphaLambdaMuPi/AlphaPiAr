@@ -29,9 +29,9 @@ class Drone:
         logger.debug('Self testing...')
         TEST_COUNT = 250
         t = 0
-        accs = np.zeros(3)
-        omegas = np.zeros(3)
-        pressures = np.zeros(1)
+        accs = []
+        omegas = []
+        pressures = []
         for i in range(5):
             s = yield from self.reader.readline()
         while t < TEST_COUNT:
@@ -42,18 +42,23 @@ class Drone:
             omega = self.data['gyro']
             pressure = self.data['pressure']
 
-            accs += np.array(acc)
-            omegas += np.array(omega)
-            pressures += np.array(pressure)
+            acc[2] -= self.g
+            accs.append(np.array(acc))
+            omegas.append(np.array(omega))
+            pressures.append(np.array(pressure))
 
-        self.acc0 = accs / TEST_COUNT
-        self.acc0[2] -= self.g
-        self.omega0 = omegas / TEST_COUNT
-        self.p0 = pressures / TEST_COUNT
+        accs = np.array(accs)
+        omegas = np.array(omegas)
+        pressures = np.array(pressures)
+
+        self.acc0 = np.mean(accs, axis=0)
+        self.omega0 = np.mean(omegas, axis=0)
+        self.p0 = np.mean(pressures, axis=0)
+
         logger.debug('Self test completed.')
-        logger.debug('acc0 : {}'.format(self.acc0))
-        logger.debug('omega0 : {}'.format(self.omega0))
-        logger.debug('p0 : {}'.format(self.p0))
+        logger.debug('acc0 : {} ± {}'.format(self.acc0, np.std(accs, axis=0)))
+        logger.debug('omega0 : {} ± {}'.format(self.omega0, np.std(omegas, axis=0)))
+        logger.debug('p0 : {} ± {}'.format(self.p0, np.std(pressures, axis=0)))
 
         self._worker = self.loop.create_task(self._run())
         self.ready.set_result(True)
