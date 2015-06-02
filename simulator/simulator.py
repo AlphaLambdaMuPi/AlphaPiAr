@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from pid import PIDController
@@ -8,17 +9,13 @@ from num_model import Drone
 np.set_printoptions(precision=4, suppress=True)
 
 def get_pid1():
-    # KPxy = 0.1
-    # KPz = 0.8
-    # KPt = 1.
     KPxy = 0.
-    KPz = 0.
+    KPz = 1.
     KPt = 1.
     kp = np.vstack([np.diag([-KPxy, -KPxy, KPz]), np.zeros((3, 3))])
-    kd = np.array([1]*2 + [1.2] + [1.2]*3)[np.newaxis].T * kp
-    kd[2] = 2 * np.sqrt(kp[2])
+    kd = np.array([1.]*3 + [0.05]*3)[np.newaxis].T * kp
+    # kd[2] = 2 * np.sqrt(kp[2])
     ki = 0.1 * kp
-    ki[2] = 0.
     ke = 0.9
     controller = PIDController(kp, kd, ki, ke)
     return controller
@@ -35,7 +32,7 @@ def get_pid2():
     kpw3 = [-KPxy, -KPxy, KPz, -KPw, KPw, KPw]
     kpw4 = [-KPxy, KPxy, KPz, KPw, KPw, -KPw]
     kp = np.array([kpw1, kpw2, kpw3, kpw4])
-    kd = np.array([0.6]*3 + [1.2]*3) * kp
+    kd = np.array([0.025]*3 + [0.02]*3) * kp
     ki = np.array([1/4]*3 + [1/8]*3) * kp
     ke = 0.9
     controller = PIDController(kp, kd, ki, ke)
@@ -44,30 +41,36 @@ def get_pid2():
 class Simulator:
     def __init__(self):
         self.drone = Drone()
-        self.drone.set_init([0., 0., 0.], [2., 2., 0.])
-        # drone.noise_acc = 1e-10
-        # drone.noise_omega = 1e-10
+        self.drone.set_init([0., 0., 0.], [2., 2., 2.])
+        self.drone.dt = 5e-4
+        # self.drone.noise_z = 1e-10
 
     def run(self):
+        AAAO = []
         last_time = 0.
         G = self.drone.g
         ctl1 = get_pid1()
         ctl2 = get_pid2()
-        DES = np.array([3., 3., 3.])
+        DES = np.array([0., 0., 0.])
         action = np.array([0.] * 4)
         DTIME = 20e-3
-        while True:
+
+        zmm = 0
+        alpha = 0.9
+        while True and self.drone.get_time() < 1000:
             self.drone.step()
             if self.drone.get_time() - last_time > DTIME:
                 dt = self.drone.get_time() - last_time
                 last_time = self.drone.get_time()
 
-                pos = self.drone.get_position()
-                meas = np.array(self.drone.get_sensors()).flatten()
+                acc, omega, z = self.drone.get_sensors()
+                zmm = zmm * alpha + (1-alpha) * z
+                pos = np.array([0, 0, zmm])
                 uacc = ctl1.get_control(last_time, dt, pos, DES)
                 # uacc[0] += 1
                 # uacc[2] += np.sqrt(G**2 - 1)
                 uacc[2] += G
+                meas = np.array((acc, omega)).flatten()
                 u = ctl2.get_control(last_time, dt, meas, uacc)
                 action += u
                 action = np.maximum.reduce([action, np.zeros(4)])
@@ -85,6 +88,11 @@ class Simulator:
                 pos = self.drone.get_position()
                 ori = self.drone.rot
                 yield pos, ori
+                # AAAO.append((uacc[2], self.drone.acc_sensor[2],
+                             # uacc[2] + ctl1._kd[2,2] * self.drone.vel[2] + ctl1._kp[2,2] * pos[2]))
+        # plt.plot(AAAO)
+        # plt.show()
+
 
 
 sim = Simulator()
