@@ -1,5 +1,11 @@
+#! /usr/bin/env python3
+
+import asyncio
+import logging
 import numpy as np
 import scipy.linalg
+
+logger = logging.getLogger()
 
 class Drone:
     def __init__(self):
@@ -12,7 +18,7 @@ class Drone:
         self.Iz = 0.25 * self.M * self.R**2
         self.Ixy = self.Iz * 0.5
         self.I = np.diag([self.Ixy, self.Ixy, self.Iz])
-        self.LIFT_K = 0.01
+        self.LIFT_K = 7.5e-3
         self.TDRAG_K = 0.0
         self.DRAG_B = 0.5
 
@@ -41,7 +47,10 @@ class Drone:
 
     def diff_matrix(self, omega, dt):
         olen = np.linalg.norm(omega)
-        wx, wy, wz = omega / olen
+        if olen:
+            wx, wy, wz = omega / olen
+        else:
+            wx, wy, wz = 0., 0., 0.
         th = olen * dt
         K = np.array([
             [0., -wz, wy], 
@@ -69,7 +78,7 @@ class Drone:
     def set_motors(self, motor):
         self.motor = motor
 
-    def step(self):
+    def step(self, dt=5e-4):
         pomega = self.motor
         rot = self.rot
         lifts = [self.lift(x) for x in pomega]
@@ -87,15 +96,14 @@ class Drone:
             torque_ref - np.cross(omega_ref, np.dot(I_ref, omega_ref))
         )
 
-        dmx = self.diff_matrix(self.omega + rotacc_ref * self.dt / 2., self.dt)
+        dmx = self.diff_matrix(self.omega + rotacc_ref * dt / 2., dt)
         self.rot = np.dot(dmx, self.rot)
-        self.pos += self.vel * self.dt + acc_ref * self.dt**2 / 2.
-        self.vel += acc_ref * self.dt
-        self.omega += rotacc_ref * self.dt
-        self.time += self.dt
+        self.pos += self.vel * dt + acc_ref * dt**2 / 2.
+        self.vel += acc_ref * dt
+        self.omega += rotacc_ref * dt
 
     def get_time(self):
-        return self.time
+        return asyncio.get_event_loop().time()
 
     def get_sensors(self):
         acc = self.acc_sensor + np.random.normal(scale=self.noise_acc)
@@ -113,7 +121,32 @@ class Drone:
         self.vel = np.array(vel, dtype=np.float64)
         self.omega = np.array(omega, dtype=np.float64)
 
-if __name__ == '__main__':
-    drone = Drone()
-    drone.step()
+    @asyncio.coroutine
+    def _run(self):
+        last_time = self.get_time()
+        while True:
+            try:
+                yield from asyncio.sleep(0.0002)
+                now = self.get_time()
+                dt = now - last_time
+                self.step(dt)
+                last_time = now
+            except (asyncio.CancelledError, KeyboardInterrupt):
+                break
+
+    @asyncio.coroutine
+    def start_control(self):
+        self._worker = asyncio.get_event_loop().create_task(self._run())
+
+    @asyncio.coroutine
+    def get_ready(self):
+        return True
+
+    @asyncio.coroutine
+    def stop(self):
+        self._worker.cancel()
+        yield from asyncio.wait_for(self._worker, None)
+
+    def alive(self):
+        return len(self._worker.get_stack()) > 0
 

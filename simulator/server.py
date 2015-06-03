@@ -5,14 +5,16 @@ import websockets
 import json
 import logging
 
-from simulator import sim
+from simulator import Simulator
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('websockets.protocol')
+logger.setLevel(logging.WARNING)
+logger = logging.getLogger()
 
 class SimServer:
     def __init__(self):
-        self.simdata = sim.run()
+        self.sim = Simulator()
+        self.sim.run()
         self._conns = []
 
     @asyncio.coroutine
@@ -35,15 +37,16 @@ class SimServer:
     @asyncio.coroutine
     def run(self, ws):
         while ws.open:
-            pos, ori = next(self.simdata)
+            pos, ori = yield from self.sim.get_data()
             pos = list(pos)
             ori = list(ori.flatten())
             data = json.dumps({'pos':pos, 'ori':ori})
             yield from self._send(ws, data)
+            yield from asyncio.sleep(0.02)
 
     @asyncio.coroutine
     def close(self):
         for ws in self._conns:
             yield from ws.close()
+        yield from self.sim.stop()
 
-server = SimServer()

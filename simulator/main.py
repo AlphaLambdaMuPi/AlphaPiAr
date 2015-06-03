@@ -4,13 +4,13 @@ import asyncio
 import websockets
 import logging
 
-from server import server
+from server import SimServer
 
 async_logger = logging.getLogger("asyncio")
 async_logger.setLevel(logging.WARNING)
 
 logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 def clear_tasks(loop):
     logger.info('clear tasks...')
@@ -22,6 +22,7 @@ def clear_tasks(loop):
         logger.info('some tasks failed.')
 
 if __name__ == "__main__":
+    server = SimServer()
     start_server = websockets.serve(server, 'localhost', 9007)
 
     loop = asyncio.get_event_loop()
@@ -33,7 +34,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print()
         loop.run_until_complete(server.close())
-        clear_tasks(loop)
     finally:
         loop.close()
         print("exit.")
