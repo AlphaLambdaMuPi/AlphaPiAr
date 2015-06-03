@@ -39,10 +39,10 @@ class Controller:
             # KPxy = 0.
             # KPz = 0.
             # KPw = 0.
-            kpw1 = [KPxy, KPxy, KPz, KPw, -KPw, KPw]
-            kpw2 = [KPxy, -KPxy, KPz, -KPw, -KPw, -KPw]
-            kpw3 = [-KPxy, -KPxy, KPz, -KPw, KPw, KPw]
-            kpw4 = [-KPxy, KPxy, KPz, KPw, KPw, -KPw]
+            kpw1 = [-KPxy, 0., KPz, 0., KPw, KPw]
+            kpw2 = [0., -KPxy, KPz, KPw, 0., -KPw]
+            kpw3 = [KPxy, 0., KPz, 0., -KPw, KPw]
+            kpw4 = [0., KPxy, KPz, -KPw, 0., -KPw]
             kp = np.array([kpw1, kpw2, kpw3, kpw4])
             kd = np.array([0.]*3 + [0.0]*3) * kp
             ki = np.array([0.]*3 + [0.]*3) * kp
@@ -93,13 +93,14 @@ class Controller:
 
         while self.drone.alive() and not self.stop_signal:
             yield from asyncio.sleep(DTIME)
-            self.update()
+            yield from self.update()
 
+    @asyncio.coroutine
     def update(self):
         now = self.loop.time()
         dt = now - self.last_time
 
-        acc, omega, z = self.drone.get_sensors()
+        acc, omega, z = yield from self.drone.get_sensors()
 
         pos = np.array([0., 0., 0.])
         uacc = self.ctl1.get_control(now, dt, pos, self.despos)
@@ -109,7 +110,7 @@ class Controller:
         self.action += u
         self.action = np.maximum.reduce([self.action, np.zeros(4)])
         self.action = np.minimum.reduce([self.action, np.full((4,), 800)])
-        self.drone.set_motors(self.action)
+        yield from self.drone.set_motors(self.action)
 
         self.last_time = now
 

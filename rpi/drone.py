@@ -5,6 +5,8 @@ import logging
 import numpy as np
 import json
 
+from .arduino import Arduino
+
 logger = logging.getLogger()
 
 class Drone:
@@ -15,13 +17,8 @@ class Drone:
 
     @asyncio.coroutine
     def start_control(self):
-        self.p = yield from asyncio.create_subprocess_shell(
-            'python arduino.py',
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-        )
-        self.reader = self.p.stdout
-        self.writer = self.p.stdin
+        self.arduino = Arduino()
+        yield from self.arduino.setup()
 
         logger.debug('Self testing...')
         TEST_COUNT = 250
@@ -29,12 +26,10 @@ class Drone:
         accs = []
         omegas = []
         pressures = []
-        for i in range(5):
-            s = yield from self.reader.readline()
         while t < TEST_COUNT:
-            s = yield from self.reader.readline()
+            s = yield from self.arduino.read_sensors()
             t += 1
-            self.data = json.loads(s.decode())
+            self.data = s
             acc = self.data['accel']
             omega = self.data['gyro']
             pressure = self.data['pressure']
@@ -57,7 +52,6 @@ class Drone:
         logger.debug('omega0 : {} ± {}'.format(self.omega0, np.std(omegas, axis=0)))
         logger.debug('p0 : {} ± {}'.format(self.p0, np.std(pressures, axis=0)))
 
-        self._worker = self.loop.create_task(self._run())
         self.ready.set_result(True)
 
     @asyncio.coroutine
@@ -67,15 +61,15 @@ class Drone:
 
     @asyncio.coroutine
     def stop(self):
-        self._worker.cancel()
-        yield from asyncio.wait_for(self._worker, None)
+        pass
 
     def alive(self):
         return self.p.returncode is None
 
+    @asyncio.coroutine
     def set_motors(self,motorcmd):
-        motorcmd = map(int, np.minimum(motorcmd+1200, 1700))
-        self.writer.write((' '.join(map(str, motorcmd)) + '\n').encode())
+        motorcmd = list(map(int, np.minimum(motorcmd+1200, 1700)))
+        yield from self.arduino.write_motors(motorcmd)
 
     def getacc(self):
         return self.data['accel'] - self.acc0
@@ -85,23 +79,11 @@ class Drone:
 
     def getz(self):
         return (self.p0 - self.data['pressure']) * 0.083
-
-    def get_sensors(self):
-        return self.getacc(), self.getomega(), self.getz()
-
+    
     @asyncio.coroutine
-    def _run(self):
-        while True:
-            try:
-                data = yield from self.reader.readline()
-                tmp = json.loads(data.decode())
-                if tmp['pressure'] < 90000:
-                    continue
-                self.data = tmp
-            except Exception as epsilon:
-                print('Epsilon', epsilon)
-                print('Data : ', data)
-                yield from asyncio.sleep(0.2)
+    def get_sensors(self):
+        self.data = yield from self.arduino.read_sensors()
+        return self.getacc(), self.getomega(), self.getz()
 
 rpi_drone = Drone()
 

@@ -74,6 +74,7 @@ class Drone:
             tau += np.cross(self.ppos[i], lf)
         return tau
 
+    @asyncio.coroutine
     def set_motors(self, motor):
         self.motor = motor
 
@@ -104,6 +105,7 @@ class Drone:
     def get_time(self):
         return asyncio.get_event_loop().time()
 
+    @asyncio.coroutine
     def get_sensors(self):
         acc = self.acc_sensor + np.random.normal(scale=self.noise_acc)
         omega = np.dot(self.invrot(), self.omega) + np.random.normal(scale=self.noise_omega)
