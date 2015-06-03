@@ -33,12 +33,11 @@ class Drone:
         self.acc_sensor = np.zeros(3)
         self.motor = np.zeros(4)
 
-        rz = self.R * (2. ** -0.5)
         self.ppos = [
-            np.array([rz, rz, 0.]),
-            np.array([rz, -rz, 0.]),
-            np.array([-rz, -rz, 0.]),
-            np.array([-rz, rz, 0.]),
+            np.array([-self.R, 0., 0.]),
+            np.array([0., self.R, 0.]),
+            np.array([self.R, 0., 0.]),
+            np.array([0., -self.R, 0.]),
         ]
         self.pdir = [-1., 1., -1., 1.]
 
