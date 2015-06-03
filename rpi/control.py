@@ -62,9 +62,9 @@ def main():
         loop.run_forever()
     except KeyboardInterrupt:
         loop.run_until_complete(cc.close())
-        print('exit.')
     finally:
         loop.close()
+        print('exit.')
 
 if __name__ == "__main__":
     main()

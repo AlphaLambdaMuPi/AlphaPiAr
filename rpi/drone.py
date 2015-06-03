@@ -13,9 +13,6 @@ class Drone:
         self.ready = asyncio.Future(loop=self.loop)
         self.g = 9.80
 
-    def alive(self):
-        return self.p.returncode is None
-
     @asyncio.coroutine
     def start_control(self):
         self.p = yield from asyncio.create_subprocess_shell(
@@ -67,6 +64,14 @@ class Drone:
     def get_ready(self):
         yield from self.ready
         return self.ready.result()
+
+    @asyncio.coroutine
+    def stop(self):
+        self._worker.cancel()
+        yield from asyncio.wait_for(self._worker, None)
+
+    def alive(self):
+        return self.p.returncode is None
 
     def set_motors(self,motorcmd):
         motorcmd = map(int, np.minimum(motorcmd+1200, 1700))

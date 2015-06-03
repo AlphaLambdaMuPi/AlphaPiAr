@@ -131,7 +131,10 @@ class Drone:
                 dt = now - last_time
                 self.step(dt)
                 last_time = now
-            except (asyncio.CancelledError, KeyboardInterrupt):
+            except asyncio.CancelledError:
+                break
+            except KeyboardInterrupt:
+                logger.debug('capture ctrl-C in num_model.')
                 break
 
     @asyncio.coroutine

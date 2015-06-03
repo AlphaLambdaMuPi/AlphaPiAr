@@ -30,6 +30,9 @@ class StreamConnection:
             except ConnectionError:
                 logger.debug("connection error")
                 break
+            except KeyboardInterrupt:
+                logger.debug("capture ctrl-C in connection, ignored.")
+
         logger.debug("connection closed")
 
     def _convert(self, data):

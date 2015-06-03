@@ -5,7 +5,7 @@ from asyncio.queues import Queue, QueueEmpty
 import json
 import logging
 
-from connection import JsonConnection
+from .connection import JsonConnection
 
 logger = logging.getLogger()
 
@@ -32,10 +32,13 @@ class Client:
                         loop=self._loop
                     )
                     self._conn = JsonConnection(sr, sw, loop=self._loop)
-                    return
+                    break
                 except ConnectionError:
                     logger.debug('connection failed')
                     yield from asyncio.sleep(10)
+                except KeyboardInterrupt:
+                    logger.debug('capture ctrl-C, cancel the connection.')
+                    break
 
         try:
             yield from _connect()

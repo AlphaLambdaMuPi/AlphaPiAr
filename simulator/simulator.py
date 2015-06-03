@@ -5,8 +5,9 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .num_model import Drone
+
 from controller import Controller
-from num_model import Drone
 
 logger = logging.getLogger()
 

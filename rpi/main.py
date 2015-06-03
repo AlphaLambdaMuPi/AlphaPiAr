@@ -6,22 +6,19 @@ from collections import namedtuple
 import time
 import numpy as np
 
-from logsetting import log_setup
-from client import Client
+from .client import Client
+from .drone import rpi_drone
+
 from controller import Controller
-from drone import rpi_drone
+
+logger = logging.getLogger()
 
 Server = namedtuple('Server', 'ip port')
-
 controller = Controller(rpi_drone)
-
-log_setup()
-logger = logging.getLogger()
 
 @asyncio.coroutine
 def start_control():
     rst = yield from controller.run()
-
     if not rst:
         logger.info("drone is not ready QQ")
     
@@ -65,7 +62,7 @@ def get_command(client):
     logger.debug("control connection closed.")
 
 
-if __name__ == "__main__":
+def run_server():
     loop = asyncio.get_event_loop()
     s = Server('140.112.18.210', 12345)
     cc = Client(s)
@@ -75,9 +72,10 @@ if __name__ == "__main__":
     try:
         loop.run_forever()
     except KeyboardInterrupt:
+        logger.debug('capture ctrl-C in rpi main.')
         loop.run_until_complete(cc.close())
-        print('exit.')
     finally:
         loop.close()
+        logger.info('exit.')
 
 

@@ -5,7 +5,7 @@ import websockets
 import json
 import logging
 
-from simulator import Simulator
+from .simulator import Simulator
 
 logger = logging.getLogger('websockets.protocol')
 logger.setLevel(logging.WARNING)

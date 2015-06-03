@@ -5,16 +5,12 @@ import logging
 import json
 import numpy as np
 
-from pid import PID
+from .pid import PID
 
 logger = logging.getLogger()
-datalogger = logging.getLogger('data')
-datalogger.propagate = False
-fh = logging.FileHandler('action.log')
-datalogger.addHandler(fh)
 
 class Controller:
-    def __init__(self, drone, *, loop=None):
+    def __init__(self, drone, *, loop=None, log=False):
         self.loop = loop if loop else asyncio.get_event_loop()
         self.drone = drone
         self.action = np.array([0., 0., 0., 0.])
@@ -57,6 +53,17 @@ class Controller:
         self.ctl1 = get_pid1()
         self.ctl2 = get_pid2()
 
+        # logging
+        self.datalogger = None
+        if log:
+            self.logger_setup()
+
+    def logger_setup(self):
+        self.datalogger = logging.getLogger('data')
+        self.datalogger.propagate = False
+        fh = logging.FileHandler('action.log')
+        self.datalogger.addHandler(fh)
+
     def set_despos(self, pos):
         self.despos = pos
 
@@ -73,7 +80,7 @@ class Controller:
 
             yield from self._run()
         except (asyncio.CancelledError, KeyboardInterrupt):
-            pass
+            logger.debug('capture ctrl-C in controller.')
         finally:
             yield from self.landing()
 
@@ -107,10 +114,11 @@ class Controller:
         self.last_time = now
 
         # logging
-        datalogger.info(json.dumps({
-            'action':self.action.tolist(),
-            'meas': meas.tolist(),
-        }))
+        if self.datalogger:
+            self.datalogger.info(json.dumps({
+                'action':self.action.tolist(),
+                'meas': meas.tolist(),
+            }))
 
     @asyncio.coroutine
     def takeoff(self):
