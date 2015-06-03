@@ -21,6 +21,8 @@ class Controller:
 
         self.offset = 0. # testing purpose
 
+        self.zmm = 0
+
         def get_pid1():
             KPxy = 0.
             KPz = 0.
@@ -35,16 +37,18 @@ class Controller:
         def get_pid2():
             KPxy = 5.
             KPz = 10.
-            KPw = 10.
+            KPxyw = 10.
+            KPzw = 10.
             # KPxy = 0.
-            # KPz = 0.
-            # KPw = 0.
-            kpw1 = [-KPxy, 0., KPz, 0., KPw, KPw]
-            kpw2 = [0., -KPxy, KPz, KPw, 0., -KPw]
-            kpw3 = [KPxy, 0., KPz, 0., -KPw, KPw]
-            kpw4 = [0., KPxy, KPz, -KPw, 0., -KPw]
+            KPz = 0.
+            # KPxyw = 0.
+            KPzw = 0.
+            kpw1 = [-KPxy, 0., KPz, 0., KPxyw, KPzw]
+            kpw2 = [0., KPxy, KPz, KPxyw, 0., -KPzw]
+            kpw3 = [KPxy, 0., KPz, 0., -KPxyw, KPzw]
+            kpw4 = [0., -KPxy, KPz, -KPxyw, 0., -KPzw]
             kp = np.array([kpw1, kpw2, kpw3, kpw4])
-            kd = np.array([0.]*3 + [0.0]*3) * kp
+            kd = np.array([0.]*3 + [0.02]*3) * kp
             ki = np.array([0.]*3 + [0.]*3) * kp
             ke = 0.9
             ctl = PID(kp, kd, ki, ke)
@@ -102,6 +106,8 @@ class Controller:
 
         acc, omega, z = yield from self.drone.get_sensors()
 
+        alpha = 0.9
+        self.zmm = self.zmm * alpha + z * (1 - alpha)
         pos = np.array([0., 0., 0.])
         uacc = self.ctl1.get_control(now, dt, pos, self.despos)
         uacc[2] += self.drone.g + self.offset # testing purpose
