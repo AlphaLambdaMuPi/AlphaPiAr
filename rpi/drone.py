@@ -68,7 +68,8 @@ class Drone:
 
     @asyncio.coroutine
     def set_motors(self,motorcmd):
-        motorcmd = list(map(int, np.minimum(motorcmd+1200, 1300)))
+        motorcmd = list(map(int, np.minimum(motorcmd+1200, 1400)))
+        motorcmd[2] = motorcmd[4] = 0
         yield from self.arduino.write_motors(motorcmd)
 
     def getacc(self):

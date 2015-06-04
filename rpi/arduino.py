@@ -1,11 +1,14 @@
 #! /usr/bin/env python3
 
 import sys
+import logging
 import asyncio
 import json
 import random
 import struct
 import serial
+
+logger = logging.getLogger()
 
 class Arduino:
     def __init__(self, *, loop=None):
@@ -15,29 +18,54 @@ class Arduino:
             self._loop = asyncio.get_event_loop()
 
         self._waitings = asyncio.Queue(loop=self._loop)
-        self._loop.add_reader(self._ser.fileno(), self._get_data)
     
     def _get_data(self):
         try:
             fut, s = self._waitings.get_nowait()
+            while fut.done():
+                fut, s = self._waitings.get_nowait()
         except asyncio.QueueEmpty:
-            logger.error('arduino yapsilon!!!!')
+            res = self._ser.read(self._ser.inWaiting())
+            logger.error('arduino yapsilon!!!! {}'.format(res))
         else:
             res = self._ser.read(s)
             fut.set_result(res)
 
+    @asyncio.coroutine
     def communicate(self, cmd, size=None):
-        w = None
-        if size:
-            w = asyncio.Future(loop=self._loop)
-            self._waitings.put_nowait((w, size))
-        self._ser.write(cmd)
-        self._ser.flush()
-        return w
+        if not size:
+            self._ser.write(cmd)
+            self._ser.flush()
+            return
+
+        w = asyncio.Future(loop=self._loop)
+        self._waitings.put_nowait((w, size))
+        retry = 0
+        res = None
+        while not w.done() and retry <= 10:
+            self._ser.write(cmd)
+            self._ser.flush()
+            try:
+                res = yield from asyncio.wait_for(asyncio.shield(w), 3.5)
+            except asyncio.TimeoutError:
+                retry += 1
+                logger.debug('Retry {}'.format(retry))
+            else:
+                break
+        if res is None:
+            logger.critical('飛機con掉了...好慘喔...QQQ')
+            w.cancel()
+
+        return res
 
     @asyncio.coroutine
     def setup(self):
+        '''
+        initialize the connection with arduino using serial
+        '''
         self._ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=3)
+        self._loop.add_reader(self._ser.fileno(), self._get_data)
+        logger.debug('start setup...')
         while True:
             ret = yield from self.communicate(b'S', 1)
             if ret == b's':
@@ -50,57 +78,76 @@ class Arduino:
                              ' (received {})'.format(ret))
 
     def decode_sensors(self, b):
+        '''
+        decode sensors data from bytes to dict.
+        '''
         res = []
+        retsize = [
+            ('accel', 3),
+            ('gyro', 3),
+            ('mag', 3),
+            ('temperature', 1),
+            ('pressure', 1),
+        ]
         ret = {}
-        for i in range(11):
-            res.append(struct.unpack('f', b[4*i:4*(i+1)]))
-        
-        ret['accel'] = res[0:3]
-        ret['gyro'] = res[3:6]
-        ret['mag'] = res[6:9]
-        ret['temperature'] = res[9]
-        ret['pressure'] = res[10]
         ret['time'] = self._loop.time()
+        scnt = 0
+        for t, s in retsize:
+            ret[t] = struct.unpack('f'*s, b[4*scnt:4*(scnt+s)])
+            scnt += s
 
         return ret
 
     @asyncio.coroutine
     def read_sensors(self):
+        '''
+        read sensors from arduino.
+        '''
         # ax, ay, az, gx, gy, gz, mx, my, mz, temp, pres
         data = yield from self.communicate(b'R', 4*11)
-        data = self.decode_sensor(data)
+        data = self.decode_sensors(data)
         return data
 
     @asyncio.coroutine
-    def write_motors(motors):
+    def write_motors(self, motors):
         '''
-        send control signals to drone's motors via arduino
+        send control signals to drone's motors via arduino.
         motors - a list containing four int numbers which indicate
                  the control signals for drone's motors.
         '''
-        self.communicate(b'M')
-        st = struct.pack('hhhh', motors)
+        yield from self.communicate(b'M')
+        st = struct.pack('hhhh', *motors)
         res = yield from self.communicate(st, 1)
         if res != b'm':
             raise IOError('Write motor to Arduino failed !!!')
+        else:
+            logger.debug('motors writed.')
 
-if __name__ == "__main__":
+def run_arduino():
     loop = asyncio.get_event_loop()
-
     arduino = Arduino()
 
     @asyncio.coroutine
     def read_stdin():
+        yield from arduino.setup()
         reader = asyncio.StreamReader()
         reader_protocol = asyncio.StreamReaderProtocol(reader)
         yield from loop.connect_read_pipe(lambda: reader_protocol, sys.stdin)
         while True:
-            data = (yield from reader.readline()).encode().strip()
-            motors = [int(x) for x in data.split()]
+            data = (yield from reader.readline()).decode().strip()
+            if data == 'R':
+                s = yield from arduino.read_sensors()
+                logger.debug(s)
+                continue
             try:
+                motors = [int(x) for x in data.split()]
+                if len(motors) != 4:
+                    continue
                 yield from arduino.write_motors(motors)
             except IOError as e:
                 logger.error(e)
+            except ValueError:
+                pass
     
     try:
         loop.run_until_complete(read_stdin())
@@ -109,3 +156,5 @@ if __name__ == "__main__":
     finally:
         print('exit.')
 
+if __name__ == "__main__":
+    run_arduino()

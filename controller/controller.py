@@ -14,6 +14,7 @@ class Controller:
         self.loop = loop if loop else asyncio.get_event_loop()
         self.drone = drone
         self.action = np.array([0., 0., 0., 0.])
+        self.action[0] = self.action[2] = 1250
         self.despos = np.array([0., 0., 0.])
 
         self.stop_signal = False

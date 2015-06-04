@@ -4,13 +4,14 @@ import logging
 import argparse
 
 from rpi import run_server as rpi_server
+from rpi import run_arduino
 from simulator import run_server as sim_server
 
 from logsetting import log_setup
 
 parser = argparse.ArgumentParser(description='drone control and simulation.')
 parser.add_argument('-m', '--mode', help='execution mode', type=str,
-                    choices=['sim', 'rpi'], default='sim')
+                    choices=['sim', 'rpi', 'ar'])
 parser.add_argument('-f', '--logfile', help='log file', default=None)
 parser.add_argument('-l', '--loglevel', help='log level',
                     choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -23,3 +24,7 @@ if __name__ == '__main__':
         sim_server()
     elif args.mode == 'rpi':
         rpi_server()
+    elif args.mode == 'ar':
+        run_arduino()
+    else:
+        parser.print_help()
