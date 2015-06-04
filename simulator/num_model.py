@@ -34,12 +34,12 @@ class Drone:
         self.motor = np.zeros(4)
 
         self.ppos = [
-            np.array([-self.R, 0., 0.]),
-            np.array([0., self.R, 0.]),
             np.array([self.R, 0., 0.]),
+            np.array([0., self.R, 0.]),
+            np.array([-self.R, 0., 0.]),
             np.array([0., -self.R, 0.]),
         ]
-        self.pdir = [-1., 1., -1., 1.]
+        self.pdir = [1., -1., 1., -1.]
 
     def invrot(self):
         return self.rot.T

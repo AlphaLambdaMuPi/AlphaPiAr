@@ -12,7 +12,7 @@ HMC5883L hmc5883l;
 BMP085 bmp085;
 Measure meas;
 Servo servo[4];
-const int SERVO_PIN[4] = {9, 10, 11, 12};
+const int SERVO_PIN[4] = {12, 11, 10, 9};
 int64_t lastMicros = 0;
 double global_time_offset = 0;
 /* SoftwareSerial piSerial(10, 11); */
