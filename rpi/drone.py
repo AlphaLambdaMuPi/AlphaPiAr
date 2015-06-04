@@ -20,7 +20,7 @@ class Drone:
         self.arduino = Arduino()
         yield from self.arduino.setup()
 
-        logger.debug('Self testing...')
+        logger.info('Self testing...')
         TEST_COUNT = 250
         t = 0
         accs = []
@@ -30,8 +30,8 @@ class Drone:
             s = yield from self.arduino.read_sensors()
             t += 1
             self.data = s
-            acc = self.data['accel']
-            omega = self.data['gyro']
+            acc = list(self.data['accel'])
+            omega = list(self.data['gyro'])
             pressure = self.data['pressure']
 
             acc[2] -= self.g
@@ -47,10 +47,10 @@ class Drone:
         self.omega0 = np.mean(omegas, axis=0)
         self.p0 = np.mean(pressures, axis=0)
 
-        logger.debug('Self test completed.')
-        logger.debug('acc0 : {} ± {}'.format(self.acc0, np.std(accs, axis=0)))
-        logger.debug('omega0 : {} ± {}'.format(self.omega0, np.std(omegas, axis=0)))
-        logger.debug('p0 : {} ± {}'.format(self.p0, np.std(pressures, axis=0)))
+        logger.info('Self test completed.')
+        logger.info('acc0 : {} ± {}'.format(self.acc0, np.std(accs, axis=0)))
+        logger.info('omega0 : {} ± {}'.format(self.omega0, np.std(omegas, axis=0)))
+        logger.info('p0 : {} ± {}'.format(self.p0, np.std(pressures, axis=0)))
 
         self.ready.set_result(True)
 
@@ -61,15 +61,15 @@ class Drone:
 
     @asyncio.coroutine
     def stop(self):
-        pass
+        self.arduino.close()
 
     def alive(self):
-        return self.p.returncode is None
+        return self.arduino.alive()
 
     @asyncio.coroutine
     def set_motors(self,motorcmd):
         motorcmd = list(map(int, np.minimum(motorcmd+1200, 1400)))
-        motorcmd[2] = motorcmd[4] = 0
+        motorcmd[1] = motorcmd[3] = 0
         yield from self.arduino.write_motors(motorcmd)
 
     def getacc(self):

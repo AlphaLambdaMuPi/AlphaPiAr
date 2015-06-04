@@ -83,9 +83,10 @@ class Controller:
             if not ready:
                 return False
 
+            logger.info('controller start.')
             yield from self._run()
         except (asyncio.CancelledError, KeyboardInterrupt):
-            logger.debug('capture ctrl-C in controller.')
+            logger.info('capture ctrl-C in controller.')
         finally:
             yield from self.landing()
 
@@ -134,8 +135,8 @@ class Controller:
     
     @asyncio.coroutine
     def landing(self):
-        logger.debug('landing...')
-        logger.debug('landed.')
+        logger.info('landing...')
+        logger.info('landed.')
         self.stopped.set_result(True)
 
     @asyncio.coroutine

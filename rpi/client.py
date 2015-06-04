@@ -32,28 +32,27 @@ class Client:
                         loop=self._loop
                     )
                     self._conn = JsonConnection(sr, sw, loop=self._loop)
-                    break
+                    self._connected.set_result(True)
+                    logger.info('connection with drone server was made')
                 except ConnectionError:
-                    logger.debug('connection failed')
+                    logger.warning('connection failed, retry in 10 seconds.')
                     yield from asyncio.sleep(10)
                 except KeyboardInterrupt:
-                    logger.debug('capture ctrl-C, cancel the connection.')
+                    logger.info('capture ctrl-C, cancel the connection.')
                     break
 
         try:
             yield from _connect()
         except (asyncio.CancelledError, KeyboardInterrupt):
-            logger.debug('connection was cancelled')
             self._connected.set_result(False)
-            return
 
-        logger.debug('connection was made')
-        self._connected.set_result(True)
+        if not self._connected.result():
+            logger.info('connection was cancelled')
 
     @asyncio.coroutine
     def recv(self):
-        yield from self._connected
-        if not self._connected.result():
+        res = yield from self._connected
+        if not res:
             return
         return (yield from self._conn.recv())
 
@@ -63,9 +62,9 @@ class Client:
 
     @asyncio.coroutine
     def close(self):
-        yield from self._connected
-        if not self._connected.result():
-            return
-        yield from self._conn.close()
-        self._closed = True
+        if not self._connected.done():
+            self._connected.cancel()
+        elif self._connected.result():
+            yield from self._conn.close()
+            self._closed = True
 

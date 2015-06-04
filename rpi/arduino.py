@@ -7,6 +7,7 @@ import json
 import random
 import struct
 import serial
+import numpy as np
 
 logger = logging.getLogger()
 
@@ -18,6 +19,7 @@ class Arduino:
             self._loop = asyncio.get_event_loop()
 
         self._waitings = asyncio.Queue(loop=self._loop)
+        self.state = 'INIT'
     
     def _get_data(self):
         try:
@@ -53,6 +55,7 @@ class Arduino:
             else:
                 break
         if res is None:
+            self.state = 'FAILED'
             logger.critical('飛機con掉了...好慘喔...QQQ')
             w.cancel()
 
@@ -65,17 +68,32 @@ class Arduino:
         '''
         self._ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=3)
         self._loop.add_reader(self._ser.fileno(), self._get_data)
-        logger.debug('start setup...')
+        logger.info('start setup...')
         while True:
             ret = yield from self.communicate(b'S', 1)
             if ret == b's':
                 logger.info('Connected with Arduino.')
+                self.state = 'CONNECTED'
                 break
             elif ret == b'':
                 logger.info('Waiting for Arduino...')
             else:
                 logger.error('Communication with Arduino failed !!'
                              ' (received {})'.format(ret))
+                self.state = 'FAILED'
+
+    def verify_sensors(self, data):
+        acc = data['accel']
+        omega = data['gyro']
+        mag = data['mag']
+        temp = data['temperature']
+        p = data['pressure']
+        if (np.linalg.norm(acc) > 100 or np.linalg.norm(omega) > 100 
+                or np.linalg.norm(mag) > 1.1 
+                or np.linalg.norm(mag) < 0.9 or temp < 0 or temp > 45
+                or p < 90000 or p > 110000):
+            return False
+        return True
 
     def decode_sensors(self, b):
         '''
@@ -93,8 +111,13 @@ class Arduino:
         ret['time'] = self._loop.time()
         scnt = 0
         for t, s in retsize:
-            ret[t] = struct.unpack('f'*s, b[4*scnt:4*(scnt+s)])
+            ret[t] = list(struct.unpack('f'*s, b[4*scnt:4*(scnt+s)]))
+            if len(ret[t]) == 1:
+                ret[t] = ret[t][0]
             scnt += s
+
+        if not self.verify_sensors(ret):
+            return None
 
         return ret
 
@@ -104,8 +127,10 @@ class Arduino:
         read sensors from arduino.
         '''
         # ax, ay, az, gx, gy, gz, mx, my, mz, temp, pres
-        data = yield from self.communicate(b'R', 4*11)
-        data = self.decode_sensors(data)
+        data = None
+        while data is None:
+            data = yield from self.communicate(b'R', 4*11)
+            data = self.decode_sensors(data)
         return data
 
     @asyncio.coroutine
@@ -123,6 +148,14 @@ class Arduino:
         else:
             logger.debug('motors writed.')
 
+    def alive(self):
+        return self.state != 'FAILED'
+
+    def close(self):
+        self._ser.close()
+
+
+# use in arduino mode
 def run_arduino():
     loop = asyncio.get_event_loop()
     arduino = Arduino()

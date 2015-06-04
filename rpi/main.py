@@ -17,33 +17,43 @@ Server = namedtuple('Server', 'ip port')
 controller = Controller(rpi_drone)
 
 @asyncio.coroutine
+def cleanup(client, controller, drone, tasks):
+    logger.info('clean up...')
+    yield from client.close()
+    yield from controller.stop()
+    yield from drone.stop()
+    done, pending = yield from asyncio.wait(tasks)
+
+@asyncio.coroutine
 def start_control():
-    rst = yield from controller.run()
-    if not rst:
-        logger.info("drone is not ready QQ")
+    try:
+        rst = yield from controller.run()
+        if not rst:
+            logger.info("drone is not ready QQ")
+    except asyncio.CancelledError:
+        yield from controller.stop()
+        logger.info("control stop.")
     
 
 @asyncio.coroutine
 def get_command(client):
 
-    yield from client._connected
-    if not client._connected.result():
+    res = yield from client._connected
+    if not res:
         return
+
     data = {'role': 'DRONE', 'name': 'RPI_DRONE'}
     client.send(data)
 
     ready = yield from rpi_drone.get_ready()
-
     logger.debug("drone ready")
 
     data = {'status': ready}
     client.send(data)
 
-
     if not ready:
         client.close()
         return
-    
 
     while client._connected.result() and not client._closed:
         data = yield from client.recv()
@@ -61,19 +71,20 @@ def get_command(client):
 
     logger.debug("control connection closed.")
 
-
 def run_server():
     loop = asyncio.get_event_loop()
     s = Server('140.112.18.210', 12345)
     cc = Client(s)
-    loop.create_task(start_control())
-    loop.create_task(get_command(cc))
-    loop.run_until_complete(cc.connect())
+    tasks = [
+        loop.create_task(cc.connect()),
+        loop.create_task(get_command(cc)),
+        loop.create_task(start_control()),
+    ]
     try:
         loop.run_forever()
     except KeyboardInterrupt:
         logger.debug('capture ctrl-C in rpi main.')
-        loop.run_until_complete(cc.close())
+        loop.run_until_complete(cleanup(cc, controller, rpi_drone, tasks))
     finally:
         loop.close()
         logger.info('exit.')
