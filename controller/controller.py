@@ -44,11 +44,11 @@ class Controller:
             KPz = 0.
             # KPxyw = 0.
             KPzw = 0.
-            kpw1 = [-KPxy, 0., KPz, 0., KPxyw, KPzw]
-            kpw2 = [0., KPxy, KPz, KPxyw, 0., -KPzw]
-            kpw3 = [KPxy, 0., KPz, 0., -KPxyw, KPzw]
-            kpw4 = [0., -KPxy, KPz, -KPxyw, 0., -KPzw]
-            kp = np.array([kpw1, kpw2, kpw3, kpw4])
+            kpw0 = [KPxy, 0., KPz, 0., -KPxyw, -KPzw]
+            kpw1 = [0., KPxy, KPz, KPxyw, 0., KPzw]
+            kpw2 = [-KPxy, 0., KPz, 0., KPxyw, -KPzw]
+            kpw3 = [0., -KPxy, KPz, -KPxyw, 0., KPzw]
+            kp = np.array([kpw0, kpw1, kpw2, kpw3])
             kd = np.array([0.]*3 + [0.02]*3) * kp
             ki = np.array([0.]*3 + [0.]*3) * kp
             ke = 0.9
