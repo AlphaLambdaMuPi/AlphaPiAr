@@ -14,7 +14,7 @@ class Controller:
         self.loop = loop if loop else asyncio.get_event_loop()
         self.drone = drone
         self.action = np.array([0., 0., 0., 0.])
-        self.action[1] = self.action[3] = 50
+        self.action[0] = self.action[2] = 150
         self.despos = np.array([0., 0., 0.])
 
         self.stop_signal = False
@@ -36,9 +36,9 @@ class Controller:
             return ctl
 
         def get_pid2():
-            KPxy = 5.
+            KPxy = 1.
             KPz = 10.
-            KPxyw = 10.
+            KPxyw = 4.
             KPzw = 10.
             # KPxy = 0.
             KPz = 0.
@@ -49,7 +49,7 @@ class Controller:
             kpw2 = [-KPxy, 0., KPz, 0., KPxyw, -KPzw]
             kpw3 = [0., -KPxy, KPz, -KPxyw, 0., KPzw]
             kp = np.array([kpw0, kpw1, kpw2, kpw3])
-            kd = np.array([0.]*3 + [0.02]*3) * kp
+            kd = np.array([0.]*3 + [0.4]*3) * kp
             ki = np.array([0.]*3 + [0.]*3) * kp
             ke = 0.9
             ctl = PID(kp, kd, ki, ke)
@@ -94,11 +94,11 @@ class Controller:
 
     @asyncio.coroutine
     def _run(self):
-        DTIME = 20e-3
+        DTIME = 10e-3
         self.last_time = self.loop.time()
 
         while self.drone.alive() and not self.stop_signal:
-            yield from asyncio.sleep(DTIME)
+            # yield from asyncio.sleep(DTIME)
             yield from self.update()
 
     @asyncio.coroutine
@@ -117,7 +117,7 @@ class Controller:
         u = self.ctl2.get_control(now, dt, meas, uacc)
         self.action += u
         self.action = np.maximum.reduce([self.action, np.zeros(4)])
-        self.action = np.minimum.reduce([self.action, np.full((4,), 100)])
+        self.action = np.minimum.reduce([self.action, np.full((4,), 300)])
         yield from self.drone.set_motors(self.action)
 
         self.last_time = now
