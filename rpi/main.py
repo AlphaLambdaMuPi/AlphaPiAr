@@ -14,7 +14,7 @@ from controller import Controller
 logger = logging.getLogger()
 
 Server = namedtuple('Server', 'ip port')
-controller = Controller(rpi_drone)
+controller = Controller(rpi_drone, log=True)
 
 @asyncio.coroutine
 def cleanup(client, controller, drone, tasks):
