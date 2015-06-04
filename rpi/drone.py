@@ -21,7 +21,7 @@ class Drone:
         yield from self.arduino.setup()
 
         logger.info('Self testing...')
-        TEST_COUNT = 250
+        TEST_COUNT = 500
         t = 0
         accs = []
         omegas = []
