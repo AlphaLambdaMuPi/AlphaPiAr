@@ -15,6 +15,10 @@ class Controller:
         self.drone = drone
         self.action = np.array([0., 0., 0., 0.])
         self.action[0] = self.action[2] = 150
+
+        # Test to change action directly
+        self.action0 = self.action.copy()
+
         self.despos = np.array([0., 0., 0.])
 
         self.stop_signal = False
@@ -101,6 +105,10 @@ class Controller:
             # yield from asyncio.sleep(DTIME)
             yield from self.update()
 
+    def get_thetaxy(acc):
+        norm = np.linalg.norm(acc)
+        return np.array([np.asin(acc[1]/norm), np.asin(-acc[0]/norm)])
+
     @asyncio.coroutine
     def update(self):
         now = self.loop.time()
@@ -113,9 +121,17 @@ class Controller:
         pos = np.array([0., 0., 0.])
         uacc = self.ctl1.get_control(now, dt, pos, self.despos)
         uacc[2] += self.drone.g + self.offset # testing purpose
-        meas = np.array((acc, omega)).flatten()
+
+        # Change Omega to Theta
+        theta = self.get_thetaxy(acc)
+
+        meas = np.array((acc, theta, omega[-1:])).flatten()
         u = self.ctl2.get_control(now, dt, meas, uacc)
-        self.action += u
+
+        # Change action directly 
+        #self.action += u
+        self.action = u + self.action0
+        
         self.action = np.maximum.reduce([self.action, np.zeros(4)])
         self.action = np.minimum.reduce([self.action, np.full((4,), 300)])
         yield from self.drone.set_motors(self.action)
