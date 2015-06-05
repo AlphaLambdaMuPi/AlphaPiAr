@@ -9,28 +9,27 @@ from .pid import PID
 
 logger = logging.getLogger()
 
-class Controller:
+class Controller(object):
     def __init__(self, drone, *, loop=None, log=False):
-        self.loop = loop if loop else asyncio.get_event_loop()
-        self.drone = drone
-        self.action = np.array([0., 0., 0., 0.])
-        self.action[0] = self.action[2] = 150
+        if not loop:
+            loop = asyncio.get_event_loop()
+        self._loop = loop
+        self._drone = drone
+        self._action = np.array([0., 0., 0., 0.])
+        # self._action[1] = self._action[3] = 50
+        self._despos = np.array([0., 0., 0.])
 
-        # Test to change action directly
-        self.action0 = self.action.copy()
-
-        self.despos = np.array([0., 0., 0.])
-
+        self._stablized = asyncio.Future(loop=self._loop)
         self.stop_signal = False
-        self.stopped = asyncio.Future(loop=self.loop)
+        self.stopped = asyncio.Future(loop=self._loop)
 
-        self.offset = 0. # testing purpose
+        self._offset = 0. # testing purpose
 
-        self.zmm = 0
+        self._zmm = 0
 
         def get_pid1():
             KPxy = 0.
-            KPz = 0.
+            KPz = 0.8
             KPt = 1.
             kp = np.vstack([np.diag([-KPxy, -KPxy, KPz]), np.zeros((3, 3))])
             kd = np.array([1.2]*3 + [0.05]*3)[np.newaxis].T * kp
@@ -40,50 +39,51 @@ class Controller:
             return ctl
 
         def get_pid2():
-            KPxy = 1.
+            KPxy = 5.
+            # KPxyth = 5.
             KPz = 10.
-            KPxyw = 4.
+            KPxyw = 10.
             KPzw = 10.
             # KPxy = 0.
-            KPz = 0.
+            # KPz = 0.
             # KPxyw = 0.
-            KPzw = 0.
+            # KPzw = 0.
             kpw0 = [KPxy, 0., KPz, 0., -KPxyw, -KPzw]
             kpw1 = [0., KPxy, KPz, KPxyw, 0., KPzw]
             kpw2 = [-KPxy, 0., KPz, 0., KPxyw, -KPzw]
             kpw3 = [0., -KPxy, KPz, -KPxyw, 0., KPzw]
             kp = np.array([kpw0, kpw1, kpw2, kpw3])
-            kd = np.array([0.]*3 + [0.4]*3) * kp
+            kd = np.array([0.]*3 + [0.02]*3) * kp
             ki = np.array([0.]*3 + [0.]*3) * kp
             ke = 0.9
             ctl = PID(kp, kd, ki, ke)
             return ctl
 
-        self.ctl1 = get_pid1()
-        self.ctl2 = get_pid2()
+        self._ctl1 = get_pid1()
+        self._ctl2 = get_pid2()
 
         # logging
-        self.datalogger = None
+        self._datalogger = None
         if log:
-            self.logger_setup()
+            self._logger_setup()
 
-    def logger_setup(self):
-        self.datalogger = logging.getLogger('data')
-        self.datalogger.propagate = False
+    def _logger_setup(self):
+        self._datalogger = logging.getLogger('data')
+        self._datalogger.propagate = False
         fh = logging.FileHandler('action.log')
-        self.datalogger.addHandler(fh)
+        self._datalogger.addHandler(fh)
 
     def set_despos(self, pos):
-        self.despos = pos
+        self._despos = pos
 
     def get_despos(self):
-        return self.despos
+        return self._despos
 
     @asyncio.coroutine
     def run(self):
         try:
-            yield from self.drone.start_control()
-            ready = yield from self.drone.get_ready()
+            yield from self._drone.start_control()
+            ready = yield from self._drone.get_ready()
             if not ready:
                 return False
 
@@ -98,65 +98,90 @@ class Controller:
 
     @asyncio.coroutine
     def _run(self):
-        DTIME = 10e-3
-        self.last_time = self.loop.time()
+        DTIME = 20e-3
+        self._last_time = self._loop.time()
 
-        while self.drone.alive() and not self.stop_signal:
-            # yield from asyncio.sleep(DTIME)
+        res = yield from self._stablized
+        if not res:
+            return
+
+        while self._drone.alive() and not self.stop_signal:
             yield from self.update()
-
-    def get_thetaxy(acc):
-        norm = np.linalg.norm(acc)
-        return np.array([np.asin(acc[1]/norm), np.asin(-acc[0]/norm)])
 
     @asyncio.coroutine
     def update(self):
-        now = self.loop.time()
-        dt = now - self.last_time
+        '''updates the motors according to the sensors' data
+        '''
+        now = self._loop.time()
+        dt = now - self._last_time
 
-        acc, theta, omega, z = yield from self.drone.get_sensors()
+        acc, theta, omega, z = yield from self._drone.get_sensors()
 
         alpha = 0.9
-        self.zmm = self.zmm * alpha + z * (1 - alpha)
-        pos = np.array([0., 0., 0.])
-        uacc = self.ctl1.get_control(now, dt, pos, self.despos)
-        uacc[2] += self.drone.g + self.offset # testing purpose
+        self._zmm = self._zmm*alpha + z*(1-alpha)
+        # pos = np.array([0., 0., 0.])
+        pos = np.array([0., 0., self._zmm])
+        uacc = self._ctl1.get_control(now, dt, self._despos-pos)
+        uacc[2] += self._drone.g + self._offset # testing purpose
+        meas = np.array((acc, omega)).flatten()
+        u = self._ctl2.get_control(now, dt, uacc-meas)
+        self._action += u
+        yield from self.send_control()
 
-        # Change Omega to Theta
-        theta = self.get_thetaxy(acc)
-
-        meas = np.array((acc, theta, omega[-1:])).flatten()
-        u = self.ctl2.get_control(now, dt, meas, uacc)
-
-        # Change action directly 
-        #self.action += u
-        self.action = u + self.action0
-        
-        self.action = np.maximum.reduce([self.action, np.zeros(4)])
-        self.action = np.minimum.reduce([self.action, np.full((4,), 300)])
-        yield from self.drone.set_motors(self.action)
-
-        self.last_time = now
+        self._last_time = now
 
         # logging
-        if self.datalogger:
-            self.datalogger.info(json.dumps({
-                'action':self.action.tolist(),
+        if self._datalogger:
+            self._datalogger.info(json.dumps({
+                'action':self._action.tolist(),
                 'meas': meas.tolist(),
             }))
 
     @asyncio.coroutine
+    def send_control(self):
+        self._action = np.maximum.reduce([self._action, np.zeros(4)])
+        self._action = np.minimum.reduce([self._action, np.full((4,), 800)])
+        yield from self._drone.set_motors(self._action)
+
+    @asyncio.coroutine
     def takeoff(self):
-        pass
-    
+        # TODO:
+        # implement take off process and check if drone is stable.
+        if self.stopped.done():
+            return False
+        if self._stablized.done():
+            raise RuntimeError('the drone has already took off.')
+        self._stablized.set_result(True)
+        return True
+
     @asyncio.coroutine
     def landing(self):
         logger.info('landing...')
+
+        '''
+        motor = min(self._action)
+        self._action = np.full((4,), motor)
+
+        while motor > 0:
+        self._action -= 50
+        yield from self.send_control()
+        motor -= 50
+
+        '''
+
+        # for testing
+        self._action = np.zeros(4)
+        yield from self.send_control()
+
         logger.info('landed.')
+
         self.stopped.set_result(True)
 
     @asyncio.coroutine
     def stop(self):
+        if not self._stablized.done():
+            self._stablized.set_result(False)
+
         self.stop_signal = True
         yield from self.stopped
 

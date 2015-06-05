@@ -133,6 +133,7 @@ class Drone:
                 self.step(dt)
                 last_time = now
             except asyncio.CancelledError:
+                logger.debug('stop num_model simulation.')
                 break
             except KeyboardInterrupt:
                 logger.debug('capture ctrl-C in num_model.')
@@ -149,6 +150,7 @@ class Drone:
     @asyncio.coroutine
     def stop(self):
         self._worker.cancel()
+        logger.debug('stopping num model...')
         yield from asyncio.wait_for(self._worker, None)
 
     def alive(self):

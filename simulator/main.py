@@ -11,14 +11,11 @@ async_logger.setLevel(logging.WARNING)
 
 logger = logging.getLogger()
 
-def clear_tasks(loop):
-    logger.info('clear tasks...')
-    for task in asyncio.Task.all_tasks():
-        task.cancel()
-    try:
-        loop.run_until_complete(asyncio.gather(*asyncio.Task.all_tasks()))
-    except asyncio.CancelledError:
-        logger.info('some tasks failed.')
+@asyncio.coroutine
+def cleanup(coros):
+    logger.info('clean up...')
+    for coro in coros:
+        yield from coro
 
 def run_server():
     server = SimServer()
@@ -33,7 +30,10 @@ def run_server():
         loop.run_forever()
     except KeyboardInterrupt:
         logger.debug('capture ctrl-C in sim main.')
-        loop.run_until_complete(server.close())
+        coros = [
+            server.close()
+        ]
+        loop.run_until_complete(cleanup(coros))
     finally:
         loop.close()
         logger.info("exit.")

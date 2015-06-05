@@ -13,8 +13,8 @@ logger = logging.getLogger()
 
 class SimServer:
     def __init__(self):
-        self.sim = Simulator()
-        self.sim.run()
+        self._sim = Simulator()
+        self._sim.run()
         self._conns = []
 
     @asyncio.coroutine
@@ -37,7 +37,7 @@ class SimServer:
     @asyncio.coroutine
     def run(self, ws):
         while ws.open:
-            pos, ori = yield from self.sim.get_data()
+            pos, ori = yield from self._sim.get_data()
             pos = list(pos)
             ori = list(ori.flatten())
             data = json.dumps({'pos':pos, 'ori':ori})
@@ -48,5 +48,5 @@ class SimServer:
     def close(self):
         for ws in self._conns:
             yield from ws.close()
-        yield from self.sim.stop()
+        yield from self._sim.stop()
 

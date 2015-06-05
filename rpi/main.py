@@ -6,7 +6,7 @@ from collections import namedtuple
 import time
 import numpy as np
 
-from .client import Client
+from .client import SocketClient, ConsoleClient
 from .drone import rpi_drone
 
 from controller import Controller
@@ -17,12 +17,10 @@ Server = namedtuple('Server', 'ip port')
 controller = Controller(rpi_drone, log=True)
 
 @asyncio.coroutine
-def cleanup(client, controller, drone, tasks):
+def cleanup(coros):
     logger.info('clean up...')
-    yield from client.close()
-    yield from controller.stop()
-    yield from drone.stop()
-    done, pending = yield from asyncio.wait(tasks)
+    for coro in coros:
+        yield from coro
 
 @asyncio.coroutine
 def start_control():
@@ -38,7 +36,7 @@ def start_control():
 @asyncio.coroutine
 def get_command(client):
 
-    res = yield from client._connected
+    res = yield from client.connected
     if not res:
         return
 
@@ -55,26 +53,40 @@ def get_command(client):
         client.close()
         return
 
-    while client._connected.result() and not client._closed:
+    while not client.alive:
         data = yield from client.recv()
         # parse four number for motors control
-        if not controller.stopped.done():
-            if data == 1:
-                controller.offset = 0.1
-            elif data == 2:
-                controller.offset = 0.
-            elif data == 3:
-                controller.offset = -0.1
-            elif data == 0:
+        try:
+            cmd = data['action']
+            mag = data['mag']
+            if cmd == 'T':
+                ret = yield from controller.takeoff()
+            elif cmd == 'M':
+                if not controller.stop_signal:
+                    if mag == 1:
+                        controller.offset = 0.1
+                    elif mag == 2:
+                        controller.offset = 0.
+                    elif mag == 3:
+                        controller.offset = -0.1
+                else:
+                    yield from client.send(
+                        {'Error': 'controller is stopped.'}
+                    )
+
+            elif cmd == 'S':
                 controller.stop()
-            logger.debug("current target g: {}".format(controller.offset + controller.drone.g))
+        except RuntimeError:
+            pass
+        except KeyError:
+            yield from client.send({'Error': 'wrong parameters'})
 
     logger.debug("control connection closed.")
 
 def run_server():
     loop = asyncio.get_event_loop()
     s = Server('140.112.18.210', 12345)
-    cc = Client(s)
+    cc = SocketClient(s)
     tasks = [
         loop.create_task(cc.connect()),
         loop.create_task(get_command(cc)),
@@ -84,7 +96,13 @@ def run_server():
         loop.run_forever()
     except KeyboardInterrupt:
         logger.debug('capture ctrl-C in rpi main.')
-        loop.run_until_complete(cleanup(cc, controller, rpi_drone, tasks))
+        coros = [
+            cc.close(),
+            controller.stop(),
+            rpi_drone.stop(),
+            asyncio.wait(tasks),
+        ]
+        loop.run_until_complete(cleanup(coros))
     finally:
         loop.close()
         logger.info('exit.')

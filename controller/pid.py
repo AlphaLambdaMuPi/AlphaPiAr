@@ -3,23 +3,32 @@
 import numpy as np
 
 class PID:
-    def __init__(self, kp, kd, ki, ke):
+    def __init__(self, kp, kd, ki, ke, gamma=0):
         self._kp = kp
         self._kd = kd
         self._ki = ki
         self._ke = ke
+        self._gamma = gamma
         self._last_err = None
         self._int_err = 0
 
-    def get_control(self, t, dt, now, des):
-        err = des - now
+    def get_control(self, t, dt, err, derr=None):
         if self._last_err is None:
             self._last_err = err
-        derr = (err - self._last_err) / dt
+        if derr is None:
+            derr = (err - self._last_err) / dt
         self._int_err = self._int_err * self._ke + err * dt
         u = (np.dot(self._kp, err) + np.dot(self._kd, derr)
              + np.dot(self._ki, self._int_err))
 
         self._last_err = err
 
+        self._tweak_parameters(dt, err, derr, self._int_err)
+
         return u
+
+    def _tweak_parameters(self, dt, err, derr, ierr):
+        self._kp -= self._gamma * err * err * dt
+        self._kd -= self._gamma * err * derr * dt
+        self._ki -= self._gamma * err * ierr * dt
+        # pass

@@ -15,35 +15,38 @@ np.set_printoptions(precision=4, suppress=True)
 
 class Simulator:
     def __init__(self):
-        self.drone = Drone()
-        self.controller = Controller(self.drone)
-        self.loop = asyncio.get_event_loop()
-        self.drone.set_init([0., 0., 0.], [2., 0., 0.])
-        # self.AOO = []
-        # self.drone.dt = 5e-4
-        # self.drone.noise_z = 1e-10
+        self._drone = Drone()
+        self._controller = Controller(self._drone)
+        self._loop = asyncio.get_event_loop()
+        self._drone.set_init([0., 0., 0.], [2., 0., 0.])
+        # self._AOO = []
+        # self._drone.dt = 5e-4
+        # self._drone.noise_z = 1e-10
 
     def run(self):
-        self.loop.call_soon_threadsafe(
-            self.loop.create_task,
-            self.controller.run()
+        logger.info('starting simulation...')
+        self._loop.run_until_complete(self._controller.takeoff())
+        self._loop.call_soon_threadsafe(
+            self._loop.create_task,
+            self._controller.run()
         )
+        logger.info('started.')
 
     @asyncio.coroutine
     def get_data(self):
-        pos = self.drone.get_position()
-        ori = self.drone.rot
+        pos = self._drone.get_position()
+        ori = self._drone.rot
         # oori = ori[:, 2]
-        # self.AOO.append(self.drone.acc_sensor[2])
-        # self.AOO.append(oori)
+        # self._AOO.append(self._drone.acc_sensor[2])
+        # self._AOO.append(oori)
         return pos, ori
 
     @asyncio.coroutine
     def stop(self):
-        yield from self.controller.stop()
-        yield from self.drone.stop()
+        yield from self._controller.stop()
+        yield from self._drone.stop()
         # logger.debug('plotting...')
-        # plt.plot(self.AOO)
+        # plt.plot(self._AOO)
         # plt.show()
 
 sim = Simulator()

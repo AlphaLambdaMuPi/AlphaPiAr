@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 import asyncio
 from asyncio.queues import Queue, QueueEmpty
@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger()
 
-class StreamConnection:
+class StreamConnection(object):
     def __init__(self, sr, sw, *, loop=None):
         if not loop:
             loop = asyncio.get_event_loop()
@@ -63,8 +63,8 @@ class StreamConnection:
             self._sw.write(data)
         except OSError:
             raise ConnectionError("can't send data.")
-        except Exception:
-            logger.debug("Q___Q")
+        except Exception as e:
+            logger.critical("unexpected exception: {}".format(e))
 
     def alive(self):
         return not self._sr.at_eof()
@@ -95,11 +95,10 @@ class JsonConnection(StreamConnection):
         try:
             data = json.loads(data.decode())
         except UnicodeError:
-            logger.debug("can't convert byte to string")
+            logger.warning("can't convert byte to string")
         except ValueError:
-            logger.debug("get wrong json format")
+            logger.warning("get wrong json format")
         else:
-            # logger.debug("get: {}".format(data))
             return data
 
     def send(self, data):
@@ -110,4 +109,27 @@ class JsonConnection(StreamConnection):
         except ValueError:
             raise ValueError("wrong json format")
 
+class ConsoleConnection(StreamConnection):
+    def __init__(self, sr, sw, *, loop=None):
+        super().__init__(sr, sw, loop=loop)
+
+    def _convert(self, data):
+        data = super()._convert(data)
+        try:
+            data = data.decode()
+            arr = data.split()
+            fields = ['action', 'mag']
+            data = {f: v for f, v in zip(fields, arr)}
+        except UnicodeError:
+            logger.warning("can't convert byte to string")
+        else:
+            return data
+
+    def send(self, data):
+        try:
+            logger.debug("send: {}".format(data))
+            data = json.dumps(data).encode()
+            super().send(data)
+        except ValueError:
+            raise ValueError("wrong json format")
 
