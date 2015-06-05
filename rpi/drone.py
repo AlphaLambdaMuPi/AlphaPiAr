@@ -26,6 +26,7 @@ class Drone:
         accs = []
         omegas = []
         pressures = []
+        mags = []
         while t < TEST_COUNT:
             s = yield from self.arduino.read_sensors()
             t += 1

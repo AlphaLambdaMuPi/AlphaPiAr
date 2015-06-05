@@ -57,7 +57,7 @@ class Client(object):
 
 class SocketClient(Client):
     def __init__(self, server, *, loop=None):
-        super().__init__(loop)
+        super().__init__(loop=loop)
         self._server = server
 
     @asyncio.coroutine
@@ -81,7 +81,7 @@ class SocketClient(Client):
 
 class ConsoleClient(Client):
     def __init__(self, *, loop=None):
-        super().__init__(loop)
+        super().__init__(loop=loop)
 
     @asyncio.coroutine
     def _connect(self):
