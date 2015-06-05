@@ -32,24 +32,29 @@ class Drone:
             self.data = s
             acc = list(self.data['accel'])
             omega = list(self.data['gyro'])
+            mag = list(self.data['mag'])
             pressure = self.data['pressure']
 
             acc[2] -= self.g
             accs.append(np.array(acc))
             omegas.append(np.array(omega))
+            mags.append(np.array(mag))
             pressures.append(np.array(pressure))
 
         accs = np.array(accs)
         omegas = np.array(omegas)
         pressures = np.array(pressures)
+        mags = np.array(mags) / np.linalg.norm(mags)
 
         self.acc0 = np.mean(accs, axis=0)
         self.omega0 = np.mean(omegas, axis=0)
         self.p0 = np.mean(pressures, axis=0)
+        self.mag0 = np.mean(mags, axis=0)
 
         logger.info('Self test completed.')
         logger.info('acc0 : {} ± {}'.format(self.acc0, np.std(accs, axis=0)))
         logger.info('omega0 : {} ± {}'.format(self.omega0, np.std(omegas, axis=0)))
+        logger.info('mag0 : {} ± {}'.format(self.mag0, np.std(mags, axis=0)))
         logger.info('p0 : {} ± {}'.format(self.p0, np.std(pressures, axis=0)))
 
         self.ready.set_result(True)
@@ -80,11 +85,26 @@ class Drone:
 
     def getz(self):
         return (self.p0 - self.data['pressure']) * 0.083
+
+    def gettheta(self):
+        acc = self.getacc() 
+        acc /= np.linalg.norm(acc)
+        mag = self.data['mag']
+        B = np.array([0, 0, 1])[np.newaxis].T * acc
+        B += np.mag0[np.newaxis].T * mag
+        U, S, V = np.linalg.svd(B)
+        M = np.diag([1, 1, np.linalg.det(U) * np.linalg.det(V)])
+        R = np.dot(U, np.dot(M, V))
+        yaw = np.arctan2(R[1, 0] * R[0, 0])
+        pitch = np.arctan2(-R[2, 0], np.sqrt(R[2, 1] ** 2 + R[2, 2] ** 2))
+        roll = np.arctan2(R[2, 1], R[2, 2])
+        return np.array([roll, pitch, yaw])
+
     
     @asyncio.coroutine
     def get_sensors(self):
         self.data = yield from self.arduino.read_sensors()
-        return self.getacc(), self.getomega(), self.getz()
+        return self.getacc(), self.gettheta(), self.getomega(), self.getz()
 
 rpi_drone = Drone()
 

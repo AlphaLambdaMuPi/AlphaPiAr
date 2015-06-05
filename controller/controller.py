@@ -114,7 +114,7 @@ class Controller:
         now = self.loop.time()
         dt = now - self.last_time
 
-        acc, omega, z = yield from self.drone.get_sensors()
+        acc, theta, omega, z = yield from self.drone.get_sensors()
 
         alpha = 0.9
         self.zmm = self.zmm * alpha + z * (1 - alpha)
