@@ -45,12 +45,12 @@ class Drone:
         accs = np.array(accs)
         omegas = np.array(omegas)
         pressures = np.array(pressures)
-        mags = np.array(mags) / np.linalg.norm(mags)
 
         self.acc0 = np.mean(accs, axis=0)
         self.omega0 = np.mean(omegas, axis=0)
         self.p0 = np.mean(pressures, axis=0)
         self.mag0 = np.mean(mags, axis=0)
+        self.mag0 /= np.linalg.norm(self.mag0)
 
         logger.info('Self test completed.')
         logger.info('acc0 : {} ± {}'.format(self.acc0, np.std(accs, axis=0)))
@@ -92,11 +92,11 @@ class Drone:
         acc /= np.linalg.norm(acc)
         mag = self.data['mag']
         B = np.array([0, 0, 1])[np.newaxis].T * acc
-        B += np.mag0[np.newaxis].T * mag
+        B += self.mag0[np.newaxis].T * mag
         U, S, V = np.linalg.svd(B)
         M = np.diag([1, 1, np.linalg.det(U) * np.linalg.det(V)])
         R = np.dot(U, np.dot(M, V))
-        yaw = np.arctan2(R[1, 0] * R[0, 0])
+        yaw = np.arctan2(R[1, 0], R[0, 0])
         pitch = np.arctan2(-R[2, 0], np.sqrt(R[2, 1] ** 2 + R[2, 2] ** 2))
         roll = np.arctan2(R[2, 1], R[2, 2])
         return np.array([roll, pitch, yaw])
@@ -105,6 +105,7 @@ class Drone:
     @asyncio.coroutine
     def get_sensors(self):
         self.data = yield from self.arduino.read_sensors()
+        # logger.debug('{}'.format(self.data))
         return self.getacc(), self.gettheta(), self.getomega(), self.getz()
 
 rpi_drone = Drone()
