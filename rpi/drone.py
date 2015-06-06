@@ -9,7 +9,7 @@ from .arduino import Arduino
 
 logger = logging.getLogger()
 
-class Drone:
+class Drone(object):
     def __init__(self):
         self.loop = asyncio.get_event_loop()
         self.ready = asyncio.Future(loop=self.loop)

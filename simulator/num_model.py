@@ -7,7 +7,7 @@ import scipy.linalg
 
 logger = logging.getLogger()
 
-class Drone:
+class Drone(object):
     def __init__(self):
         self.dt = 2E-4
         self.time = 0.0

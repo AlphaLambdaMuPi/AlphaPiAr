@@ -11,7 +11,7 @@ logger = logging.getLogger('websockets.protocol')
 logger.setLevel(logging.WARNING)
 logger = logging.getLogger()
 
-class SimServer:
+class SimServer(object):
     def __init__(self):
         self._sim = Simulator()
         self._sim.run()

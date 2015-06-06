@@ -2,7 +2,7 @@
 
 import numpy as np
 
-class PID:
+class PID(object):
     def __init__(self, kp, kd, ki, ke, *, gamma=0):
         self.set_gain(kp, kd, ki, ke)
         self._gamma = gamma

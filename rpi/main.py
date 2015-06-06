@@ -52,7 +52,7 @@ def get_command(client):
         client.close()
         return
 
-    while not client.alive:
+    while client.alive:
         data = yield from client.recv()
         # parse four number for motors control
         try:
@@ -62,7 +62,7 @@ def get_command(client):
                 if cmd == 'T':
                     ret = yield from controller.takeoff()
                 elif cmd == 'M':
-                    args = int(args)
+                    args = int(args[0])
                     if args == 1:
                         controller.offset = 0.1
                     elif args == 2:
@@ -73,9 +73,11 @@ def get_command(client):
                     # testing rotation
                     kp, kd, ki = map(float, args)
                     controller._pids['th'].set_gain(kp, kd, ki, 0.9)
+                    logger.info('set pid.')
                 elif cmd == 'R':
                     # testing rotation
-                    controller._restriction = float(args)
+                    controller._restriction = float(args[0])
+                    logger.info('set restriction.')
                 elif cmd == 'S':
                     controller.stop()
             else:
@@ -88,6 +90,8 @@ def get_command(client):
             logger.warning('wrong values')
         except KeyError:
             yield from client.send({'Error': 'wrong parameters'})
+        except TypeError as e:
+            logger.warning('wrong type, {}'.format(e))
 
     logger.debug("control connection closed.")
 

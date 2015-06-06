@@ -13,7 +13,7 @@ logger = logging.getLogger()
 
 np.set_printoptions(precision=4, suppress=True)
 
-class Simulator:
+class Simulator(object):
     def __init__(self):
         self._drone = Drone()
         self._controller = Controller(self._drone)

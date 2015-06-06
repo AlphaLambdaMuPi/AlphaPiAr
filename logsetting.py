@@ -11,8 +11,10 @@ def log_setup(*, level=logging.DEBUG, filepath=None):
 
     logging.basicConfig(format=FORMAT, level=level)
     rootLogger = logging.getLogger()
+    
+    logFormatter = logging.Formatter(FORMAT)
 
     if filepath:
-        fileHandler = logging.fileHandler(filepath)
+        fileHandler = logging.FileHandler(filepath)
         fileHandler.setFormatter(logFormatter)
         rootLogger.addHandler(fileHandler)

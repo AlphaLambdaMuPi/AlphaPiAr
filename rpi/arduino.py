@@ -11,7 +11,7 @@ import numpy as np
 
 logger = logging.getLogger()
 
-class Arduino:
+class Arduino(object):
     def __init__(self, *, loop=None):
         if loop:
             self._loop = loop
@@ -35,25 +35,30 @@ class Arduino:
 
     @asyncio.coroutine
     def communicate(self, cmd, size=None):
-        if not size:
-            self._ser.write(cmd)
-            self._ser.flush()
+        try:
+            if not size:
+                self._ser.write(cmd)
+                self._ser.flush()
+                return
+
+            w = asyncio.Future(loop=self._loop)
+            self._waitings.put_nowait((w, size))
+            retry = 0
+            res = None
+            while not w.done() and retry <= 10:
+                self._ser.write(cmd)
+                self._ser.flush()
+                try:
+                    res = yield from asyncio.wait_for(asyncio.shield(w), 3.5)
+                except asyncio.TimeoutError:
+                    retry += 1
+                    logger.debug('Retry {}'.format(retry))
+                else:
+                    break
+        except serial.serialutil.SerialException:
+            logger.warning('arduino was not connected.')
             return
 
-        w = asyncio.Future(loop=self._loop)
-        self._waitings.put_nowait((w, size))
-        retry = 0
-        res = None
-        while not w.done() and retry <= 10:
-            self._ser.write(cmd)
-            self._ser.flush()
-            try:
-                res = yield from asyncio.wait_for(asyncio.shield(w), 3.5)
-            except asyncio.TimeoutError:
-                retry += 1
-                logger.debug('Retry {}'.format(retry))
-            else:
-                break
         if res is None:
             self.state = 'FAILED'
             logger.critical('飛機con掉了...好慘喔...QQQ')
@@ -144,7 +149,7 @@ class Arduino:
         st = struct.pack('hhhh', *motors)
         res = yield from self.communicate(st, 1)
         if res != b'm':
-            raise IOError('Write motor to Arduino failed !!!')
+            logger.error('Write motor to Arduino failed !!!')
         else:
             logger.debug('motors writed.')
 
@@ -153,6 +158,7 @@ class Arduino:
 
     def close(self):
         self._ser.close()
+        self.state = 'CLOSED'
 
 
 # use in arduino mode

@@ -1,11 +1,12 @@
 #! /usr/bin/env python3
 
+import sys
 import asyncio
 from asyncio.queues import Queue, QueueEmpty
 import json
 import logging
 
-from .connection import JsonConnection
+from .connection import JsonConnection, ConsoleConnection
 
 logger = logging.getLogger()
 
@@ -26,9 +27,9 @@ class Client(object):
         except (asyncio.CancelledError, KeyboardInterrupt):
             self.connected.set_result(False)
 
-        if not self._connected.result():
+        if not self.connected.result():
             logger.warning('connection was cancelled or failed.')
-        self.alive = self._connected.result()
+        self.alive = self.connected.result()
 
     def _connect(self):
         """classes inherits from this class should override this method to
@@ -86,16 +87,16 @@ class ConsoleClient(Client):
     @asyncio.coroutine
     def _connect(self):
         reader = asyncio.StreamReader()
-        reader_protocol = asyncio.StreamReaderProtocol(reader)
+        protocol = asyncio.StreamReaderProtocol(reader)
         yield from self._loop.connect_read_pipe(
-            lambda: reader_protocol,
+            lambda: protocol,
             sys.stdin
         )
-        tp, pro = yield from self._loop.connect_write_pipe(
-            asyncio.Protocol,
+        tp, _ = yield from self._loop.connect_write_pipe(
+            asyncio.BaseProtocol,
             sys.stdout
         )
-        writer = asyncio.StreamWriter(tp, pro, reader, self._loop)
-        self._conn = JsonConnection(reader, writer, loop=self._loop)
+        writer = asyncio.StreamWriter(tp, protocol, reader, self._loop)
+        self._conn = ConsoleConnection(reader, writer, loop=self._loop)
         self.connected.set_result(True)
 
