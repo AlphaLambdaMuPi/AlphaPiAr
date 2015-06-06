@@ -3,14 +3,17 @@
 import numpy as np
 
 class PID:
-    def __init__(self, kp, kd, ki, ke, gamma=0):
+    def __init__(self, kp, kd, ki, ke, *, gamma=0):
+        self.set_gain(kp, kd, ki, ke)
+        self._gamma = gamma
+        self._last_err = None
+        self._int_err = 0
+
+    def set_gain(self, kp, kd, ki, ke):
         self._kp = kp
         self._kd = kd
         self._ki = ki
         self._ke = ke
-        self._gamma = gamma
-        self._last_err = None
-        self._int_err = 0
 
     def get_control(self, t, dt, err, derr=None):
         if self._last_err is None:

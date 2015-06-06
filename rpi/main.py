@@ -35,7 +35,6 @@ def start_control():
 
 @asyncio.coroutine
 def get_command(client):
-
     res = yield from client.connected
     if not res:
         return
@@ -58,26 +57,35 @@ def get_command(client):
         # parse four number for motors control
         try:
             cmd = data['action']
-            mag = data['mag']
-            if cmd == 'T':
-                ret = yield from controller.takeoff()
-            elif cmd == 'M':
-                if not controller.stop_signal:
-                    if mag == 1:
+            args = data['args']
+            if not controller.stop_signal:
+                if cmd == 'T':
+                    ret = yield from controller.takeoff()
+                elif cmd == 'M':
+                    args = int(args)
+                    if args == 1:
                         controller.offset = 0.1
-                    elif mag == 2:
+                    elif args == 2:
                         controller.offset = 0.
-                    elif mag == 3:
+                    elif args == 3:
                         controller.offset = -0.1
-                else:
-                    yield from client.send(
-                        {'Error': 'controller is stopped.'}
-                    )
-
-            elif cmd == 'S':
-                controller.stop()
+                elif cmd == 'P':
+                    # testing rotation
+                    kp, kd, ki = map(float, args)
+                    controller._pids['th'].set_gain(kp, kd, ki, 0.9)
+                elif cmd == 'R':
+                    # testing rotation
+                    controller._restriction = float(args)
+                elif cmd == 'S':
+                    controller.stop()
+            else:
+                yield from client.send(
+                    {'Error': 'controller is stopped.'}
+                )
         except RuntimeError:
             pass
+        except ValueError:
+            logger.warning('wrong values')
         except KeyError:
             yield from client.send({'Error': 'wrong parameters'})
 
@@ -86,7 +94,8 @@ def get_command(client):
 def run_server():
     loop = asyncio.get_event_loop()
     s = Server('140.112.18.210', 12345)
-    cc = SocketClient(s)
+    # cc = SocketClient(s)
+    cc = ConsoleClient()
     tasks = [
         loop.create_task(cc.connect()),
         loop.create_task(get_command(cc)),

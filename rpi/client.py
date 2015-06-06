@@ -91,8 +91,6 @@ class ConsoleClient(Client):
             lambda: reader_protocol,
             sys.stdin
         )
-        reader = asyncio.StreamReader()
-        reader_protocol = asyncio.StreamReaderProtocol(reader)
         tp, pro = yield from self._loop.connect_write_pipe(
             asyncio.Protocol,
             sys.stdout
