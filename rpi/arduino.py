@@ -151,12 +151,14 @@ class Arduino(object):
         if res != b'm':
             logger.error('Write motor to Arduino failed !!!')
         else:
-            logger.debug('motors writed.')
+            # logger.debug('motors writed.')
+            pass
 
     def alive(self):
         return self.state != 'FAILED'
 
     def close(self):
+        self._ser.flush()
         self._ser.close()
         self.state = 'CLOSED'
 

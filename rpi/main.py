@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import argparse
 from collections import namedtuple
 import time
 import numpy as np
@@ -54,10 +55,13 @@ def get_command(client):
 
     while client.alive:
         data = yield from client.recv()
+        if not data:
+            continue
         # parse four number for motors control
         try:
-            cmd = data['action']
-            args = data['args']
+            data = data.split()
+            cmd = data[0]
+            args = data[1:]
             if not controller.stop_signal:
                 if cmd == 'T':
                     ret = yield from controller.takeoff()
@@ -72,14 +76,24 @@ def get_command(client):
                 elif cmd == 'P':
                     # testing rotation
                     kp, kd, ki = map(float, args)
-                    controller._pids['th'].set_gain(kp, kd, ki, 0.9)
+                    kp, kd, ki, ke = controller._pids['th'].gen_gain(
+                        kkp=kp, kkd=kd, kki=ki
+                    )
+                    controller._pids['th'].set_gain(kp, kd, ki, ke)
                     logger.info('set pid.')
                 elif cmd == 'R':
                     # testing rotation
-                    controller._restriction = float(args[0])
+                    a = float(args[0])
+                    controller._restriction = a
+                    controller._action[0] = controller._action[2] = a
                     logger.info('set restriction.')
+                elif cmd == 'E':
+                    acc, th, omg, z = yield from rpi_drone.get_sensors()
+                    logger.info('theta: {}, omega: {}'.format(th, omg))
+                    logger.info('action: {}'.format(controller._action))
                 elif cmd == 'S':
-                    controller.stop()
+                    yield from controller.stop()
+                    logger.info('drone stopped.')
             else:
                 yield from client.send(
                     {'Error': 'controller is stopped.'}
@@ -90,10 +104,13 @@ def get_command(client):
             logger.warning('wrong values')
         except KeyError:
             yield from client.send({'Error': 'wrong parameters'})
+        except IndexError:
+            yield from client.send({'Error': 'index out of range'})
         except TypeError as e:
             logger.warning('wrong type, {}'.format(e))
 
     logger.debug("control connection closed.")
+
 
 def run_server():
     loop = asyncio.get_event_loop()

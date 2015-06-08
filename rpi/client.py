@@ -81,8 +81,9 @@ class SocketClient(Client):
                 break
 
 class ConsoleClient(Client):
-    def __init__(self, *, loop=None):
+    def __init__(self, parser=None, *, loop=None):
         super().__init__(loop=loop)
+        self._parser = parser
 
     @asyncio.coroutine
     def _connect(self):
@@ -100,3 +101,9 @@ class ConsoleClient(Client):
         self._conn = ConsoleConnection(reader, writer, loop=self._loop)
         self.connected.set_result(True)
 
+    @asyncio.coroutine
+    def recv(self):
+        res = yield from super().recv()
+        if res is None or self._parser is None:
+            return res
+        return self._parser.parse_args(res.split())
