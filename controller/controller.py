@@ -18,50 +18,60 @@ class Controller(object):
         self._action = np.array([0., 0., 0., 0.])
         self._despos = np.array([0., 0., 0.])
 
-
         self._stablized = asyncio.Future(loop=self._loop)
         self.stop_signal = False
         self.stopped = asyncio.Future(loop=self._loop)
 
-        self._restriction = 800
+        self._restriction = 700
         # restriction for testing rotation
         self._restriction = 200
-
         self._action[0] = self._action[2] = self._restriction/2
 
+        # lowpass sensors
         self._zmm = 0
         self.lrf = 0
         self.thethe = np.zeros(3)
         self.omeome = np.zeros(3)
 
-        # def get_pos_gain(*,, KPxy=0., KPz=0.):
-            # KPxy = 0.
-            # KPz = 0.
-            # kp = np.vstack([np.diag([-KPxy, -KPxy, KPz])])
-            # kd = np.array([1.2]*3)[:,np.newaxis] * kp
-            # ki = 0.1 * kp
-            # ke = 0.9
-            # return (kp, kd, ki, ke)
+        # pid gain functions
+        def get_pos_gain(*, kkp=0.8, kkd=0.8, kki=0.0):
+            m = np.array([
+                [-1., 0., 0.],
+                [0., -1., 0.],
+                [0., 0., 1.],
+            ])
+            m *= np.array([0., 0., 0.])
+            kp = kkp * m
+            kd = kkd * m
+            ki = kki * m
+            ke = 0.99
+            return (kp, kd, ki, ke)
 
-        def get_acc_gain(*, KPxy=5., KPz=10., KPxyw=10., KPzw=10.):
-            kpw0 = [KPxy, 0., KPz, 0., -KPxyw, -KPzw]
-            kpw1 = [0., KPxy, KPz, KPxyw, 0., KPzw]
-            kpw2 = [-KPxy, 0., KPz, 0., KPxyw, -KPzw]
-            kpw3 = [0., -KPxy, KPz, -KPxyw, 0., KPzw]
-            kp = np.array([kpw0, kpw1, kpw2, kpw3])
-            kd = np.array([0.02]*3 + [0.4]*3) * kp
-            ki = np.array([0.0]*3 + [0.0]*3) * kp
+        def get_acc_gain(*, kkp=10., kkd=0.2, kki=0.):
+            # x, y, z, xw, yw, zw
+            m = np.array([
+                [1., 0., 1., 0., -1., -1.],
+                [0., 1., 1., 1., 0., 1.],
+                [-1., 0., 1., 0., 1., -1.],
+                [0., -1., 1., -1., 0., 1.],
+            ])
+            m *= np.array([0.5, 0.5, 0., 1., 1., 0.])
+            kp = kkp * m
+            kd = kkd * m
+            ki = kki * m
             ke = 0.99
             return (kp, kd, ki, ke)
 
         def get_th_gain(*, kkp=5., kkd=0., kki=0.):
-            KPxyth = 1.
-            KPzth = 0.
-            kpw0 = [0., -KPxyth, -KPzth]
-            kpw1 = [KPxyth, 0., KPzth]
-            kpw2 = [0., KPxyth, -KPzth]
-            kpw3 = [-KPxyth, 0., KPzth]
-            m = np.array([kpw0, kpw1, kpw2, kpw3])
+            # raw, pitch, yaw
+            # xth, yth, zth
+            m = np.array([
+                [0., -1., -1.],
+                [1., 0., 1.],
+                [0., 1., -1.],
+                [-1., 0., 1.],
+            ])
+            m *= np.array([1., 1., 0.])
             kp = kkp * m
             kd = kkd * m
             ki = kki * m
@@ -70,10 +80,12 @@ class Controller(object):
 
         # testing rotation
         self._pids = {
-            # 'pos': PID(*get_pos_gain(), gen_gain=get_pos_gain),
-            'acc': PID(*get_acc_gain(KPz=0., KPzw=0.)),
+            'pos': PID(*get_pos_gain()),
+            'acc': PID(*get_acc_gain()),
             'th': PID(*get_th_gain()),
         }
+        self._pids['pos'].gen_gain = get_pos_gain
+        self._pids['acc'].gen_gain = get_acc_gain
         self._pids['th'].gen_gain = get_th_gain
 
         # logging
@@ -122,6 +134,7 @@ class Controller(object):
         logger.info('took off and stablized.')
 
         while self._drone.alive() and not self.stop_signal:
+            yield from asyncio.sleep(DTIME)
             yield from self.update()
 
     @asyncio.coroutine
@@ -131,16 +144,18 @@ class Controller(object):
         now = self._loop.time()
         dt = now - self._last_time
 
-        acc, theta, omega, z = yield from self._drone.get_sensors()
+        acc, omega, z = yield from self._drone.get_sensors()
 
-        # alpha = 0.9
-        # self._zmm = self._zmm*alpha + z*(1-alpha)
-        # pos = np.array([0., 0., 0.])
+        alpha = 0.9
+        self._zmm = self._zmm*alpha + z*(1-alpha)
+        pos = np.array([0., 0., 0.])
         # pos = np.array([0., 0., self._zmm])
-        # uacc = self._pids['pos'].get_control(now, dt, self._despos-pos)
-        # uacc[2] += self._drone.g + self._offset # testing purpose
-        # meas = np.array((acc, omega)).flatten()
-
+        uacc = self._pids['pos'].get_control(now, dt, self._despos-pos)
+        uacc[2] += self._drone.g # testing purpose
+        uacc = np.array((uacc, np.zeros(3))).flatten()
+        meas = np.array((acc, omega)).flatten()
+        print(uacc)
+        print(meas)
 
         # testing rotation
         
@@ -151,22 +166,21 @@ class Controller(object):
         # roffset = self._pids['th'].get_control(now, dt, -self.thethe, -self.omeome)
         # roffset = self._pids['th'].get_control(now, dt, -theta, -omega)
         # roffset = self._pids['th'].get_control(now, dt, -omega)
-        meas = np.array((acc, omega)).flatten()
-        meas[2] -= 9.8
-        roffset = self._pids['acc'].get_control(now, dt, -meas)
+        # meas = np.array((acc, omega)).flatten()
+        # meas[2] -= 9.8
+        roffset = self._pids['acc'].get_control(now, dt, uacc-meas)
         # conzi = roffset - self.lrf
         # self.lrf = roffset
         # self._action[0] = self._action[2] = self._restriction/2
         self._action += roffset
         #testing mgr sin(theta) compensation
-        mgrpR = 60 * np.sin(theta[1]) / 2
-        mgoffset = np.array([mgrpR, 0., -mgrpR, 0.])
+        # mgrpR = 60 * np.sin(theta[1]) / 2
+        # mgoffset = np.array([mgrpR, 0., -mgrpR, 0.])
         # action = self._action + mgoffset
-        action = self._action
 
-        logger.debug('{}'.format(action))
+        logger.debug('{}'.format(self._action))
 
-        yield from self.send_control(action)
+        yield from self.send_control()
 
         self._last_time = now
 
@@ -178,14 +192,12 @@ class Controller(object):
             }))
 
     @asyncio.coroutine
-    def send_control(self, action=None):
-        if action is None:
-            action = self._action
-        action = np.maximum.reduce([action, np.zeros(4)])
+    def send_control(self):
+        self._action = np.maximum.reduce([self._action, np.zeros(4)])
         #testing rotation
-        action = np.minimum.reduce([action,
+        self._action = np.minimum.reduce([self._action,
                                     np.full((4,), self._restriction)])
-        yield from self._drone.set_motors(action)
+        yield from self._drone.set_motors(self._action)
 
     @asyncio.coroutine
     def takeoff(self):

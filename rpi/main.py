@@ -15,7 +15,6 @@ from controller import Controller
 logger = logging.getLogger()
 
 Server = namedtuple('Server', 'ip port')
-controller = Controller(rpi_drone, log=True)
 
 @asyncio.coroutine
 def cleanup(coros):
@@ -24,7 +23,7 @@ def cleanup(coros):
         yield from coro
 
 @asyncio.coroutine
-def start_control():
+def start_control(controller):
     try:
         rst = yield from controller.run()
         if not rst:
@@ -35,7 +34,7 @@ def start_control():
     
 
 @asyncio.coroutine
-def get_command(client):
+def get_command(client, controller):
     res = yield from client.connected
     if not res:
         return
@@ -113,14 +112,16 @@ def get_command(client):
 
 
 def run_server():
+    global controller
+    controller = Controller(rpi_drone, log=True)
     loop = asyncio.get_event_loop()
     s = Server('140.112.18.210', 12345)
     # cc = SocketClient(s)
     cc = ConsoleClient()
     tasks = [
         loop.create_task(cc.connect()),
-        loop.create_task(get_command(cc)),
-        loop.create_task(start_control()),
+        loop.create_task(get_command(cc, controller)),
+        loop.create_task(start_control(controller)),
     ]
     try:
         loop.run_forever()

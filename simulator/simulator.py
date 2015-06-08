@@ -18,7 +18,7 @@ class Simulator(object):
         self._drone = Drone()
         self._controller = Controller(self._drone)
         self._loop = asyncio.get_event_loop()
-        self._drone.set_init([0., 0., 0.], [2., 0., 0.])
+        self._drone.set_init([0., 0., 0.], [0., 6., 0.])
         # self._AOO = []
         # self._drone.dt = 5e-4
         # self._drone.noise_z = 1e-10
@@ -48,5 +48,3 @@ class Simulator(object):
         # logger.debug('plotting...')
         # plt.plot(self._AOO)
         # plt.show()
-
-sim = Simulator()
