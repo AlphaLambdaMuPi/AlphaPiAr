@@ -145,6 +145,7 @@ class Controller(object):
         dt = now - self._last_time
 
         acc, omega, z = yield from self._drone.get_sensors()
+        theta = self._drone_theta()
 
         alpha = 0.9
         self._zmm = self._zmm*alpha + z*(1-alpha)
@@ -187,8 +188,11 @@ class Controller(object):
         # logging
         if self._datalogger:
             self._datalogger.info(json.dumps({
-                'action':self._action.tolist(),
-                'meas': theta.tolist(),
+                'action': self._action.tolist(),
+                'accel': acc.tolist(),
+                'theta': theta.tolist(),
+                'omega': omega.tolist(),
+                'time': now,
             }))
 
     @asyncio.coroutine
