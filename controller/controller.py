@@ -105,6 +105,9 @@ class Controller(object):
     def get_despos(self):
         return self._despos
 
+    def set_action(self, action):
+        self._action = action
+
     @asyncio.coroutine
     def run(self):
         try:
@@ -134,7 +137,7 @@ class Controller(object):
         logger.info('took off and stablized.')
 
         while self._drone.alive() and not self.stop_signal:
-            yield from asyncio.sleep(DTIME)
+            # yield from asyncio.sleep(DTIME)
             yield from self.update()
 
     @asyncio.coroutine
@@ -145,18 +148,16 @@ class Controller(object):
         dt = now - self._last_time
 
         acc, omega, z = yield from self._drone.get_sensors()
-        theta = self._drone_theta()
+        theta = self._drone.gettheta()
 
-        alpha = 0.9
-        self._zmm = self._zmm*alpha + z*(1-alpha)
-        pos = np.array([0., 0., 0.])
+        # alpha = 0.9
+        # self._zmm = self._zmm*alpha + z*(1-alpha)
+        # pos = np.array([0., 0., 0.])
         # pos = np.array([0., 0., self._zmm])
-        uacc = self._pids['pos'].get_control(now, dt, self._despos-pos)
-        uacc[2] += self._drone.g # testing purpose
-        uacc = np.array((uacc, np.zeros(3))).flatten()
-        meas = np.array((acc, omega)).flatten()
-        print(uacc)
-        print(meas)
+        # uacc = self._pids['pos'].get_control(now, dt, self._despos-pos)
+        # uacc[2] += self._drone.g # testing purpose
+        # uacc = np.array((uacc, np.zeros(3))).flatten()
+        # meas = np.array((acc, omega)).flatten()
 
         # testing rotation
         
@@ -169,11 +170,11 @@ class Controller(object):
         # roffset = self._pids['th'].get_control(now, dt, -omega)
         # meas = np.array((acc, omega)).flatten()
         # meas[2] -= 9.8
-        roffset = self._pids['acc'].get_control(now, dt, uacc-meas)
+        # roffset = self._pids['acc'].get_control(now, dt, uacc-meas)
         # conzi = roffset - self.lrf
         # self.lrf = roffset
         # self._action[0] = self._action[2] = self._restriction/2
-        self._action += roffset
+        # self._action += roffset * dt
         #testing mgr sin(theta) compensation
         # mgrpR = 60 * np.sin(theta[1]) / 2
         # mgoffset = np.array([mgrpR, 0., -mgrpR, 0.])

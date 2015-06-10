@@ -106,7 +106,7 @@ class Drone(object):
     def get_sensors(self):
         self.data = yield from self.arduino.read_sensors()
         # logger.debug('{}'.format(self.data))
-        return self.getacc(), self.gettheta(), self.getomega(), self.getz()
+        return self.getacc(), self.getomega(), self.getz()
 
 rpi_drone = Drone()
 

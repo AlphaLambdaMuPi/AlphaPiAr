@@ -59,20 +59,15 @@ def get_command(client, controller):
         # parse four number for motors control
         try:
             data = data.split()
-            cmd = data[0]
-            args = data[1:]
+            action = data['action']
+            args = data['args']
             if not controller.stop_signal:
-                if cmd == 'T':
+                if action == 'T':
                     ret = yield from controller.takeoff()
-                elif cmd == 'M':
-                    args = int(args[0])
-                    if args == 1:
-                        controller.offset = 0.1
-                    elif args == 2:
-                        controller.offset = 0.
-                    elif args == 3:
-                        controller.offset = -0.1
-                elif cmd == 'P':
+                elif action == 'M':
+                    args = np.array([int(x) for x in args])
+                    controller.set_action(args)
+                elif action == 'P':
                     # testing rotation
                     kp, kd, ki = map(float, args)
                     kp, kd, ki, ke = controller._pids['th'].gen_gain(
@@ -80,31 +75,35 @@ def get_command(client, controller):
                     )
                     controller._pids['th'].set_gain(kp, kd, ki, ke)
                     logger.info('set pid.')
-                elif cmd == 'R':
+                elif action == 'R':
                     # testing rotation
-                    a = float(args[0])
-                    controller._restriction = a
-                    controller._action[0] = controller._action[2] = a
+                    controller._restriction = float(args[0])
+                    client.send({
+                    })
                     logger.info('set restriction.')
-                elif cmd == 'E':
-                    acc, th, omg, z = yield from rpi_drone.get_sensors()
+                elif action == 'E':
+                    acc, omg, z = yield from rpi_drone.get_sensors()
+                    client.send({
+                        'accel': acc,
+                        'omega': omg,
+                        'z': z,
+                        'time': rpi_drone.data['time']
+                    })
                     logger.info('theta: {}, omega: {}'.format(th, omg))
                     logger.info('action: {}'.format(controller._action))
-                elif cmd == 'S':
+                elif action == 'S':
                     yield from controller.stop()
                     logger.info('drone stopped.')
             else:
-                yield from client.send(
-                    {'Error': 'controller is stopped.'}
-                )
+                client.send({'Error': 'controller is stopped.'})
         except RuntimeError:
             pass
         except ValueError:
             logger.warning('wrong values')
         except KeyError:
-            yield from client.send({'Error': 'wrong parameters'})
+            client.send({'Error': 'wrong parameters'})
         except IndexError:
-            yield from client.send({'Error': 'index out of range'})
+            client.send({'Error': 'index out of range'})
         except TypeError as e:
             logger.warning('wrong type, {}'.format(e))
 

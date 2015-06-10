@@ -47,6 +47,9 @@ class Client(object):
     def send(self, data):
         if self.connected.done():
             self._conn.send(data)
+            return True
+        else:
+            return False
 
     @asyncio.coroutine
     def close(self):
@@ -107,3 +110,4 @@ class ConsoleClient(Client):
         if res is None or self._parser is None:
             return res
         return self._parser.parse_args(res.split())
+
