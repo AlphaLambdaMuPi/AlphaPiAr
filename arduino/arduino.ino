@@ -137,6 +137,9 @@ void loop()
       srs(motor[i]);
       motor[i] = min(motor[i], 2000);
       motor[i] = max(motor[i], 1000);
+      if(motor[i] <= 1210) {
+        motor[i] = 1150;
+      }
     }
     set_motor();
     Serial.write('m');
