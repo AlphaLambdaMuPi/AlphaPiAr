@@ -63,7 +63,7 @@ class Controller(object):
             return (kp, kd, ki, ke)
 
         def get_th_gain(*, kkp=5., kkd=0., kki=0.):
-            # raw, pitch, yaw
+            # roll, pitch, yaw
             # xth, yth, zth
             m = np.array([
                 [0., -1., -1.],
@@ -80,13 +80,10 @@ class Controller(object):
 
         # testing rotation
         self._pids = {
-            'pos': PID(*get_pos_gain()),
-            'acc': PID(*get_acc_gain()),
-            'th': PID(*get_th_gain()),
+            'roll': PID(100, 0, 0, 0),
+            'pitch': PID(0, 0, 0, 0),
+            'omegaz': PID(0, 0, 0, 0),
         }
-        self._pids['pos'].gen_gain = get_pos_gain
-        self._pids['acc'].gen_gain = get_acc_gain
-        self._pids['th'].gen_gain = get_th_gain
 
         # logging
         self._datalogger = None
@@ -149,36 +146,27 @@ class Controller(object):
 
         acc, omega, z = yield from self._drone.get_sensors()
         theta = self._drone.gettheta()
+        target_theta = np.array([0, 0, 0])
+        target_omegaz = np.array([0, 0, 0])
+        err_theta = target_theta - theta
+        err_omega = target_omega - omega
 
-        # alpha = 0.9
-        # self._zmm = self._zmm*alpha + z*(1-alpha)
-        # pos = np.array([0., 0., 0.])
-        # pos = np.array([0., 0., self._zmm])
-        # uacc = self._pids['pos'].get_control(now, dt, self._despos-pos)
-        # uacc[2] += self._drone.g # testing purpose
-        # uacc = np.array((uacc, np.zeros(3))).flatten()
-        # meas = np.array((acc, omega)).flatten()
+        action_tx = self._pids['roll'].get_control(now, 
+                err_theta[0], err_omega[0])
+        action_ty = self._pids['pitch'].get_control(now, 
+                err_theta[1], err_omega[1])
 
-        # testing rotation
-        
-        # alpha = 0.9
-        # self.thethe = self.thethe * alpha + theta * (1-alpha)
-        # self.omeome = self.omeome * alpha + omega * (1-alpha)
+        action_omegaz = self._pids['omegaz'].get_control(now, 
+                err_omega[2])
 
-        # roffset = self._pids['th'].get_control(now, dt, -self.thethe, -self.omeome)
-        # roffset = self._pids['th'].get_control(now, dt, -theta, -omega)
-        # roffset = self._pids['th'].get_control(now, dt, -omega)
-        # meas = np.array((acc, omega)).flatten()
-        # meas[2] -= 9.8
-        # roffset = self._pids['acc'].get_control(now, dt, uacc-meas)
-        # conzi = roffset - self.lrf
-        # self.lrf = roffset
-        # self._action[0] = self._action[2] = self._restriction/2
-        # self._action += roffset * dt
-        #testing mgr sin(theta) compensation
-        # mgrpR = 60 * np.sin(theta[1]) / 2
-        # mgoffset = np.array([mgrpR, 0., -mgrpR, 0.])
-        # action = self._action + mgoffset
+        TEST_VALUE = 1300
+        self._action = np.array([TEST_VALUE] * 4) + np.array([
+            -action_ty - action_omegaz,
+            action_tx  - action_omegaz,
+            action_ty  + action_omegaz,
+            -action_tx + action_omegaz,
+        ])
+
 
         logger.debug('{}'.format(self._action))
 
