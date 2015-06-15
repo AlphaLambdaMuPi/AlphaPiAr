@@ -58,7 +58,6 @@ def get_command(client, controller):
             continue
         # parse four number for motors control
         try:
-            data = data.split()
             action = data['action']
             args = data['args']
             if not controller.stop_signal:
@@ -67,6 +66,7 @@ def get_command(client, controller):
                 elif action == 'M':
                     args = np.array([int(x) for x in args])
                     controller.set_action(args)
+                    logger.info('set action to {}'.format(args))
                 elif action == 'P':
                     # testing rotation
                     kp, kd, ki = map(float, args)
@@ -115,8 +115,8 @@ def run_server():
     controller = Controller(rpi_drone, log=True)
     loop = asyncio.get_event_loop()
     s = Server('140.112.18.210', 12345)
-    # cc = SocketClient(s)
-    cc = ConsoleClient()
+    cc = SocketClient(s)
+    # cc = ConsoleClient()
     tasks = [
         loop.create_task(cc.connect()),
         loop.create_task(get_command(cc, controller)),

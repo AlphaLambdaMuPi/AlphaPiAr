@@ -24,8 +24,8 @@ class Controller(object):
 
         self._restriction = 700
         # restriction for testing rotation
-        self._restriction = 200
-        self._action[0] = self._action[2] = self._restriction/2
+        self._restriction = 250
+        # self._action[0] = self._action[2] = self._restriction/2
 
         # lowpass sensors
         self._zmm = 0
@@ -106,7 +106,8 @@ class Controller(object):
         return self._despos
 
     def set_action(self, action):
-        self._action = action
+        # self._action = action
+        self._action = np.array([-100, action[0], -100, -100])
 
     @asyncio.coroutine
     def run(self):
@@ -198,7 +199,7 @@ class Controller(object):
 
     @asyncio.coroutine
     def send_control(self):
-        self._action = np.maximum.reduce([self._action, np.zeros(4)])
+        self._action = np.maximum.reduce([self._action, np.full((4,), -100)])
         #testing rotation
         self._action = np.minimum.reduce([self._action,
                                     np.full((4,), self._restriction)])
