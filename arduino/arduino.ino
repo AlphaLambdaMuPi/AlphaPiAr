@@ -26,6 +26,7 @@ void setup() {
   mpu6050.initialize();
   /* Serial.println(mpu6050.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed"); */
   
+  mpu6050.setDLPFMode(3); // 3 : 40Hz
   mpu6050.setI2CBypassEnabled(true);
   mpu6050.setI2CMasterModeEnabled(false);
 
@@ -108,6 +109,14 @@ Measure& read_data(bool prn=false)
   if(prn)
   {
     swf(meas.temperature); swf(meas.pressure);
+  }
+
+  float voltage = analogRead(1) / 1024. * 10.16;
+  float current = analogRead(2) / 1024. * 17.0;
+  
+  if(prn)
+  {
+    swf(voltage); swf(current);
   }
 
   return meas;

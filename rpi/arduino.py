@@ -111,6 +111,8 @@ class Arduino(object):
             ('mag', 3),
             ('temperature', 1),
             ('pressure', 1),
+            ('voltage', 1),
+            ('current', 1),
         ]
         ret = {}
         ret['time'] = self._loop.time()
@@ -134,7 +136,7 @@ class Arduino(object):
         # ax, ay, az, gx, gy, gz, mx, my, mz, temp, pres
         data = None
         while data is None:
-            data = yield from self.communicate(b'R', 4*11)
+            data = yield from self.communicate(b'R', 4*13)
             data = self.decode_sensors(data)
         return data
 
