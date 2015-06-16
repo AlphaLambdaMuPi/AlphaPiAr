@@ -111,8 +111,8 @@ Measure& read_data(bool prn=false)
     swf(meas.temperature); swf(meas.pressure);
   }
 
-  float voltage = analogRead(1) / 1024. * 10.16;
-  float current = analogRead(2) / 1024. * 17.0;
+  float voltage = analogRead(1) * 5. / 1024.;
+  float current = analogRead(2) * 5. / 1024.;
   
   if(prn)
   {
