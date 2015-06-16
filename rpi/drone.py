@@ -74,11 +74,13 @@ class Drone(object):
 
     @asyncio.coroutine
     def set_motors(self,motorcmd):
-        motorcmd = list(map(int, np.minimum(motorcmd+1200, 1500)))
+        motorcmd = list(map(int, np.minimum(motorcmd+1200, 2000)))
         yield from self.arduino.write_motors(motorcmd)
 
     def getacc(self):
-        return self.data['accel'] - self.acc0
+        acc = self.data['accel'] - self.acc0
+        acc[2] = (9.8**2 - acc[0]**2 - acc[1]**2)**0.5
+        return acc
 
     def getomega(self):
         return self.data['gyro'] - self.omega0
