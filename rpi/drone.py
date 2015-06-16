@@ -23,6 +23,7 @@ class Drone(object):
         logger.info('Self testing...')
         TEST_COUNT = 500
         t = 0
+        volts = []
         accs = []
         omegas = []
         pressures = []
@@ -31,21 +32,25 @@ class Drone(object):
             s = yield from self.arduino.read_sensors()
             t += 1
             self.data = s
+            volt = self.data['voltage']
             acc = list(self.data['accel'])
             omega = list(self.data['gyro'])
             mag = list(self.data['mag'])
             pressure = self.data['pressure']
 
             acc[2] -= self.g
+            volts.append(np.array(volt))
             accs.append(np.array(acc))
             omegas.append(np.array(omega))
             mags.append(np.array(mag))
             pressures.append(np.array(pressure))
 
+        volts = np.array(volts)
         accs = np.array(accs)
         omegas = np.array(omegas)
         pressures = np.array(pressures)
 
+        self.volt0 = np.mean(volts, axis=0)
         self.acc0 = np.mean(accs, axis=0)
         self.omega0 = np.mean(omegas, axis=0)
         self.p0 = np.mean(pressures, axis=0)
@@ -53,6 +58,7 @@ class Drone(object):
         self.mag0 /= np.linalg.norm(self.mag0)
 
         logger.info('Self test completed.')
+        logger.info('Voltage : {} ± {}'.format(self.volt0, np.std(volts, axis=0)))
         logger.info('acc0 : {} ± {}'.format(self.acc0, np.std(accs, axis=0)))
         logger.info('omega0 : {} ± {}'.format(self.omega0, np.std(omegas, axis=0)))
         logger.info('mag0 : {} ± {}'.format(self.mag0, np.std(mags, axis=0)))

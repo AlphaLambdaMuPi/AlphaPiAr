@@ -126,6 +126,10 @@ class Arduino(object):
         if not self.verify_sensors(ret):
             return None
 
+        volrate = 0.9755
+        ret['voltage'] *= volrate * 10.16
+        ret['current'] = volrate * ret['current'] * 16.6 + 0.73
+
         return ret
 
     @asyncio.coroutine
@@ -179,7 +183,14 @@ def run_arduino():
         while True:
             data = (yield from reader.readline()).decode().strip()
             if data == 'R':
-                s = yield from arduino.read_sensors()
+                res = []
+                TN = 100
+                for i in range(TN):
+                    s = yield from arduino.read_sensors()
+                    res.append(s)
+                s = {}
+                for k in res[0]:
+                    s[k] = sum(np.array(res[i][k]) for i in range(TN)) / TN
                 logger.debug(s)
                 continue
             try:
