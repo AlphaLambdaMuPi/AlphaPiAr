@@ -4,18 +4,17 @@ import numpy as np
 
 class PID(object):
     def __init__(self, kp, kd, ki, imax):
-        self.set_gain(kp, kd, ki)
         self._last_time = None
         self._last_err = None
         self._int_err = 0
         self._imax = imax
-        self._int_restriction = imax / (ki + 1e-10)
+        self.set_gain(kp, kd, ki)
 
     def set_gain(self, kp, kd, ki):
         self._kp = kp
         self._kd = kd
         self._ki = ki
-        self._int_restriction = self.imax / (self.ki + 1e-10)
+        self._int_restriction = self._imax / (self._ki + 1e-10)
 
     def get_control(self, t, err, derr=None):
 
