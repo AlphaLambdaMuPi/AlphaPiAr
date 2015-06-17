@@ -85,7 +85,7 @@ class Drone(object):
 
     def getacc(self):
         acc = self.data['accel'] - self.acc0
-        acc[2] = (9.8**2 - acc[0]**2 - acc[1]**2)**0.5
+        # acc[2] = (9.8**2 - acc[0]**2 - acc[1]**2)**0.5
         return acc
 
     def getomega(self):

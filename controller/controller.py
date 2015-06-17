@@ -24,7 +24,7 @@ class Controller(object):
 
         # self._restriction = 700
         # restriction for testing rotation
-        self._restriction = 250
+        self._restriction = 800
         # self._action[0] = self._action[2] = self._restriction/2
 
         # lowpass sensors
@@ -62,7 +62,7 @@ class Controller(object):
             ke = 0.99
             return (kp, kd, ki, ke)
 
-        def get_th_gain(*, kkp=60., kkd=30., kki=10.):
+        def get_th_gain(*, kkp=40., kkd=20., kki=8.):
             # raw, pitch, yaw
             # xth, yth, zth
             m = np.array([
@@ -162,11 +162,15 @@ class Controller(object):
 
         # testing rotation
         
+        # final
         alpha = 0.5
         self.thethe = self.thethe * alpha + theta * (1-alpha)
         self.omeome = self.omeome * alpha + omega * (1-alpha)
 
         roffset = self._pids['th'].get_control(now, dt, -self.thethe, -self.omeome)
+
+
+
         # roffset = self._pids['th'].get_control(now, dt, -theta, -omega)
         # roffset = self._pids['th'].get_control(now, dt, -omega)
         # meas = np.array((acc, omega)).flatten()
@@ -174,9 +178,14 @@ class Controller(object):
         # roffset = self._pids['acc'].get_control(now, dt, uacc-meas)
         # conzi = roffset - self.lrf
         # self.lrf = roffset
+
+
+        # final
         self._action[0] = self._action[2] = self._restriction/2
         self._action[0] += roffset[0]# - 20# * dt
         self._action[2] += roffset[2]# + 20# * dt
+
+
         #testing mgr sin(theta) compensation
         # mgrpR = 60 * np.sin(theta[1]) / 2
         # mgoffset = np.array([mgrpR, 0., -mgrpR, 0.])
@@ -193,8 +202,10 @@ class Controller(object):
             self._datalogger.info(json.dumps({
                 'action': self._action.tolist(),
                 'accel': acc.tolist(),
-                'theta': self.thethe.tolist(),
-                'omega': self.omeome.tolist(),
+                'theta': theta.tolist(),
+                'omega': omega.tolist(),
+                'thethe': self.thethe.tolist(),
+                'omeome': self.omeome.tolist(),
                 'time': now,
             }))
 
@@ -204,7 +215,9 @@ class Controller(object):
         #testing rotation
         self._action = np.minimum.reduce([self._action,
                                     np.full((4,), self._restriction)])
-        self._action[1] = self._action[3] = -100
+        # self._action[1] = self._action[3] = -100
+        # self._action[2] = -100
+        # self._action[2] = self._action[0] = -100
         yield from self._drone.set_motors(self._action)
 
     @asyncio.coroutine
