@@ -6,6 +6,7 @@ import json
 import numpy as np
 
 from .pid import PID
+from utils import Momentum
 
 logger = logging.getLogger()
 
@@ -30,8 +31,8 @@ class Controller(object):
         # lowpass sensors
         self._zmm = 0
         self.lrf = 0
-        self.thethe = np.zeros(3)
-        self.omeome = np.zeros(3)
+        self.theta_mom = Momentum()
+        self.omega_mom = Momentum()
 
         # pid gain functions
         def get_pos_gain(*, kkp=0.8, kkd=0.8, kki=0.0):
@@ -79,14 +80,20 @@ class Controller(object):
             return (kp, kd, ki, ke)
 
         # testing rotation
+        #self._pids = {
+            #'pos': PID(*get_pos_gain()),
+            #'acc': PID(*get_acc_gain()),
+            #'th': PID(*get_th_gain()),
+        #}
+        #self._pids['pos'].gen_gain = get_pos_gain
+        #self._pids['acc'].gen_gain = get_acc_gain
+        #self._pids['th'].gen_gain = get_th_gain
+
         self._pids = {
-            'pos': PID(*get_pos_gain()),
-            'acc': PID(*get_acc_gain()),
-            'th': PID(*get_th_gain()),
-        }
-        self._pids['pos'].gen_gain = get_pos_gain
-        self._pids['acc'].gen_gain = get_acc_gain
-        self._pids['th'].gen_gain = get_th_gain
+                'theta_x': PID(50., 20., 8., 50.)
+                'theta_y': PID(50., 20., 8., 50.)
+                'omega_z': PID(0., 0., 0., 0.)
+            }
 
         # logging
         self._datalogger = None
@@ -163,11 +170,18 @@ class Controller(object):
         # testing rotation
         
         # final
-        alpha = 0.5
-        self.thethe = self.thethe * alpha + theta * (1-alpha)
-        self.omeome = self.omeome * alpha + omega * (1-alpha)
+        #alpha = 0.5
+        #self.thethe = self.thethe * alpha + theta * (1-alpha)
+        #self.omeome = self.omeome * alpha + omega * (1-alpha)
 
-        roffset = self._pids['th'].get_control(now, dt, -self.thethe, -self.omeome)
+        theta_smooth = self.theta_mom.append_value(now, theta)
+        omega_smooth = self.omega_mom.append_value(now, omega)
+        theta_x_action = self._pids['theta_x'].get_control(now, dt, 
+                -theta_smooth[0], -omega_smooth[0])
+        theta_y_action = self._pids['theta_y'].get_control(now, dt, 
+                -theta_smooth[1], -omega_smooth[1])
+        omega_z_action = self._pids['omega_z'].get_control(now, dt, 
+                -omega_smooth[2])
 
 
 
@@ -182,8 +196,10 @@ class Controller(object):
 
         # final
         self._action[0] = self._action[2] = self._restriction/2
-        self._action[0] += roffset[0]# - 20# * dt
-        self._action[2] += roffset[2]# + 20# * dt
+        self._action[0] += -theta_y_action
+        self._action[2] += theta_y_action
+        #self._action[0] += roffset[0]# - 20# * dt
+        #self._action[2] += roffset[2]# + 20# * dt
 
 
         #testing mgr sin(theta) compensation

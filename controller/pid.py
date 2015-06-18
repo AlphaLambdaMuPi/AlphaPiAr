@@ -3,35 +3,48 @@
 import numpy as np
 
 class PID(object):
-    def __init__(self, kp, kd, ki, ke, *, gamma=0):
-        self.set_gain(kp, kd, ki, ke)
-        self._gamma = gamma
+    def __init__(self, kp, kd, ki, imax):
+        self._last_time = None
         self._last_err = None
         self._int_err = 0
+        self._imax = imax
+        self.set_gain(kp, kd, ki)
 
-    def set_gain(self, kp, kd, ki, ke):
+    def set_gain(self, kp, kd, ki):
         self._kp = kp
         self._kd = kd
         self._ki = ki
-        self._ke = ke
+        self._int_restriction = self._imax / (self._ki + 1e-10)
 
-    def get_control(self, t, dt, err, derr=None):
+    def get_control(self, t, err, derr=None):
+
+        up = self._kp * err
+
         if self._last_err is None:
             self._last_err = err
+
+        if self._last_time is None:
+            self._last_time = t
+            return up
+
+        dt = t - self._last_time + 1e-10
         if derr is None:
             derr = (err - self._last_err) / dt
-        self._int_err = self._int_err * self._ke + err * dt
-        u = (np.dot(self._kp, err) + np.dot(self._kd, derr)
-             + np.dot(self._ki, self._int_err))
+
+        ud = derr * kd
+
+        self._int_err += self._int_err * dt
+
+        if self._int_err > self._int_restriction:
+            self._int_err = self._int_restriction
+
+        if self._int_err < -self._int_restriction:
+            self._int_err = -self._int_restriction
+
+        ui = self._int_err * ki
 
         self._last_err = err
+        self._last_time = t
 
-        self._tweak_parameters(dt, err, derr, self._int_err)
+        return up + ud + ui
 
-        return u
-
-    def _tweak_parameters(self, dt, err, derr, ierr):
-        self._kp -= self._gamma * err * err * dt
-        self._kd -= self._gamma * err * derr * dt
-        self._ki -= self._gamma * err * ierr * dt
-        # pass
