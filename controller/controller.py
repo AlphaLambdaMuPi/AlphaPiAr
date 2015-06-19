@@ -7,6 +7,7 @@ import numpy as np
 
 from .pid import PID
 from .utils import Momentum
+from .kalfil import ThetaOmegaKalmanFilter
 
 logger = logging.getLogger()
 
@@ -16,6 +17,9 @@ class Controller(object):
             loop = asyncio.get_event_loop()
         self._loop = loop
         self._drone = drone
+        self._kf = []
+        for i in range(3):
+            self._kf.append(ThetaOmegaKalmanFilter(0.1, 0.1, 0.04))
         self._action = np.array([0., 0., 0., 0.])
         self._thrust = 0
         self._target_angle = np.array([0., 0.])
@@ -26,8 +30,8 @@ class Controller(object):
 
         self._restriction = 800
 
-        self.theta_mom = Momentum()
-        self.omega_mom = Momentum()
+        # self.theta_mom = Momentum()
+        # self.omega_mom = Momentum()
 
         self._pid_thetaxy = np.array(80., 40., 10., 50.)
 
@@ -107,8 +111,18 @@ class Controller(object):
         acc, omega, z = yield from self._drone.get_sensors()
         theta = self._drone.gettheta()
 
-        theta_smooth = self.theta_mom.append_value(now, theta)
-        omega_smooth = self.omega_mom.append_value(now, omega)
+        theta_smooth = []
+        omega_smooth = []
+        for i in range(3):
+            theome = np.array([theta[i], omega[i]])
+            self._kf[i].update(now, theome)
+            res = self._kf[i].predict(now)
+            theta_smooth.append(res[0])
+            omega_smooth.append(res[1])
+        theta_smooth = np.array(theta_smooth)
+        omega_smooth = np.array(omega_smooth)
+        # theta_smooth = self.theta_mom.append_value(now, theta)
+        # omega_smooth = self.omega_mom.append_value(now, omega)
         thetaxy_error = self._target_angle - theta_smooth[0:2]
         omegaz_error  = 0                  - omega_smooth[2]
 
