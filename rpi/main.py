@@ -47,7 +47,8 @@ def do_action(action, args):
             yield from controller.stop()
             logger.info('drone stopped.')
     else:
-        client.send({'Error': 'controller is stopped.'})
+        pass
+        # client.send({'Error': 'controller is stopped.'})
 
 @asyncio.coroutine
 def get_command(client, controller):
@@ -101,7 +102,7 @@ def run_server():
         loop.create_task(sclient.connect()),
         # loop.create_task(cclient.connect()),
         loop.create_task(get_command(sclient, controller)),
-        loop.create_task(get_command(cclient, controller)),
+        # loop.create_task(get_command(cclient, controller)),
         loop.create_task(start_control(controller)),
     ]
     try:

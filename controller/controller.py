@@ -28,17 +28,18 @@ class Controller(object):
         self.stop_signal = False
         self.stopped = asyncio.Future(loop=self._loop)
 
-        self._restriction = 800
+        self._restriction = 700
 
         # self.theta_mom = Momentum()
         # self.omega_mom = Momentum()
 
-        self._pid_thetaxy = np.array(80., 40., 10., 50.)
+        self._pid_thetaxy = np.array([56., 10., 32.])
+        self._pid_tweakper = np.array([1., 1., 1.])
 
         self._pids = {
-                'theta_x': PID(*self._pid_thetaxy),
-                'theta_y': PID(*self._pid_thetaxy),
-                'omega_z': PID(20., 0., 5., 40.),
+                'theta_x': PID(*self._pid_thetaxy, imax=50.),
+                'theta_y': PID(*self._pid_thetaxy, imax=50.),
+                'omega_z': PID(40., 5., 0., imax=40.),
             }
 
         # logging
@@ -61,11 +62,18 @@ class Controller(object):
     def set_thrust(self, thrust):
         self._thrust = thrust
 
-    def set_angle(self, angle):
-        self._target_angle = np.array(angle).flatten()
+    def set_angle(self, angle_x, angle_y):
+        self._target_angle = np.array([angle_x, angle_y])
 
     def tweak_pid(self, type_, per):
-        gain = self._pid_thetaxy * per
+        if type_ == 'P':
+            self._pid_tweakper[0] = per
+        elif type_ == 'I':
+            self._pid_tweakper[1] = per
+        elif type_ == 'D':
+            self._pid_tweakper[2] = per
+        gain = self._pid_thetaxy * self._pid_tweakper
+        print(gain)
         self._pids['theta_x'].set_gain(*gain)
         self._pids['theta_y'].set_gain(*gain)
 
@@ -98,13 +106,15 @@ class Controller(object):
         logger.info('took off and stablized.')
 
         while self._drone.alive() and not self.stop_signal:
-            # yield from asyncio.sleep(DTIME)
+            yield from asyncio.sleep(0.)
             yield from self.update()
 
     @asyncio.coroutine
     def update(self):
         '''updates the motors according to the sensors' data
         '''
+        if self._thrust < 10:
+            return
         now = self._loop.time()
         dt = now - self._last_time
 
@@ -136,10 +146,10 @@ class Controller(object):
                 now, omegaz_error
             )
 
-        self._action[0] += -theta_y_action + -omega_z_action
-        self._action[1] +=  theta_x_action +  omega_z_action
-        self._action[2] +=  theta_y_action + -omega_z_action
-        self._action[3] += -theta_x_action +  omega_z_action
+        self._action[0] = -theta_y_action +  omega_z_action
+        self._action[1] =  theta_x_action + -omega_z_action
+        self._action[2] =  theta_y_action +  omega_z_action
+        self._action[3] = -theta_x_action + -omega_z_action
 
         logger.debug('{}'.format(self._action))
 
@@ -167,8 +177,9 @@ class Controller(object):
             final_action = np.minimum.reduce([final_action,
                                         np.full((4,), self._restriction)])
         else:
-            final_action = np.full((4, ), -100)
+            final_action = np.full((4, ), -100.)
 
+        # final_action[0] = final_action[2] = -100.
         yield from self._drone.set_motors(final_action)
 
     @asyncio.coroutine
