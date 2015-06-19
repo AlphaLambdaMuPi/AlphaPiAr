@@ -6,7 +6,7 @@ import json
 import numpy as np
 
 from .pid import PID
-from utils import Momentum
+from .utils import Momentum
 
 logger = logging.getLogger()
 
@@ -25,7 +25,7 @@ class Controller(object):
 
         # self._restriction = 700
         # restriction for testing rotation
-        self._restriction = 800
+        self._restriction = 1000
         # self._action[0] = self._action[2] = self._restriction/2
 
         # lowpass sensors
@@ -90,9 +90,9 @@ class Controller(object):
         #self._pids['th'].gen_gain = get_th_gain
 
         self._pids = {
-                'theta_x': PID(50., 20., 8., 50.)
-                'theta_y': PID(50., 20., 8., 50.)
-                'omega_z': PID(0., 0., 0., 0.)
+                'theta_x': PID(80., 40., 10., 50.),
+                'theta_y': PID(50., 20., 8., 50.),
+                'omega_z': PID(0., 0., 0., 0.),
             }
 
         # logging
@@ -176,12 +176,12 @@ class Controller(object):
 
         theta_smooth = self.theta_mom.append_value(now, theta)
         omega_smooth = self.omega_mom.append_value(now, omega)
-        theta_x_action = self._pids['theta_x'].get_control(now, dt, 
+        theta_x_action, xxx = self._pids['theta_x'].get_control(now, 
                 -theta_smooth[0], -omega_smooth[0])
-        theta_y_action = self._pids['theta_y'].get_control(now, dt, 
-                -theta_smooth[1], -omega_smooth[1])
-        omega_z_action = self._pids['omega_z'].get_control(now, dt, 
-                -omega_smooth[2])
+        # theta_y_action = self._pids['theta_y'].get_control(now, 
+                # -theta_smooth[1], -omega_smooth[1])
+        # omega_z_action = self._pids['omega_z'].get_control(now, 
+                # -omega_smooth[2])
 
 
 
@@ -195,9 +195,13 @@ class Controller(object):
 
 
         # final
-        self._action[0] = self._action[2] = self._restriction/2
-        self._action[0] += -theta_y_action
-        self._action[2] += theta_y_action
+        # self._action[0] = self._action[2] = self._restriction/2
+        # self._action[0] += -theta_y_action
+        # self._action[2] += theta_y_action
+
+        self._action[1] = self._action[3] = self._restriction / 2.
+        self._action[1] +=  theta_x_action
+        self._action[3] += -theta_x_action
         #self._action[0] += roffset[0]# - 20# * dt
         #self._action[2] += roffset[2]# + 20# * dt
 
@@ -217,11 +221,12 @@ class Controller(object):
         if self._datalogger:
             self._datalogger.info(json.dumps({
                 'action': self._action.tolist(),
+                'action_pid': xxx,
                 'accel': acc.tolist(),
                 'theta': theta.tolist(),
                 'omega': omega.tolist(),
-                'thethe': self.thethe.tolist(),
-                'omeome': self.omeome.tolist(),
+                'theta_smooth': theta_smooth.tolist(),
+                'omega_smooth': omega_smooth.tolist(),
                 'time': now,
             }))
 
@@ -233,7 +238,7 @@ class Controller(object):
                                     np.full((4,), self._restriction)])
         # self._action[1] = self._action[3] = -100
         # self._action[2] = -100
-        # self._action[2] = self._action[0] = -100
+        self._action[2] = self._action[0] = -100
         yield from self._drone.set_motors(self._action)
 
     @asyncio.coroutine

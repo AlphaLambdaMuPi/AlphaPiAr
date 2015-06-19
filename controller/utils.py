@@ -19,7 +19,7 @@ class Momentum:
             return value
 
         dt = time - self._last_time 
-        alpha = np.exp(dt/self._tau)
+        alpha = np.exp(-dt/self._tau)
         self._value = self._value * alpha + value * (1. - alpha)
 
         return self._value
