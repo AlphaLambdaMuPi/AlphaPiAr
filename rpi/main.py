@@ -32,6 +32,22 @@ def start_control(controller):
         yield from controller.stop()
         logger.info("control stop.")
     
+@asyncio.coroutine
+def do_action(action, args):
+    if not controller.stop_signal:
+        if action == 'T':
+            ret = yield from controller.takeoff()
+        elif action == 'thrust':
+            controller.set_thrust(*args)
+        elif action == 'angle':
+            controller.set_angle(*args)
+        elif action == 'tweak':
+            controller.tweak_pid(*args)
+        elif action == 'S':
+            yield from controller.stop()
+            logger.info('drone stopped.')
+    else:
+        client.send({'Error': 'controller is stopped.'})
 
 @asyncio.coroutine
 def get_command(client, controller):
@@ -60,44 +76,9 @@ def get_command(client, controller):
         try:
             action = data['action']
             args = data['args']
-            if not controller.stop_signal:
-                if action == 'T':
-                    ret = yield from controller.takeoff()
-                elif action == 'M':
-                    args = np.array([int(x) for x in args])
-                    controller.set_action(args)
-                    logger.info('set action to {}'.format(args))
-                elif action == 'P':
-                    # testing rotation
-                    kp, kd, ki = map(float, args)
-                    kp, kd, ki, ke = controller._pids['th'].gen_gain(
-                        kkp=kp, kkd=kd, kki=ki
-                    )
-                    controller._pids['th'].set_gain(kp, kd, ki, ke)
-                    logger.info('set pid.')
-                elif action == 'R':
-                    # testing rotation
-                    controller._restriction = float(args[0])
-                    client.send({
-                    })
-                    logger.info('set restriction.')
-                elif action == 'E':
-                    acc, omg, z = yield from rpi_drone.get_sensors()
-                    client.send({
-                        'accel': acc,
-                        'omega': omg,
-                        'z': z,
-                        'time': rpi_drone.data['time']
-                    })
-                    logger.info('theta: {}, omega: {}'.format(th, omg))
-                    logger.info('action: {}'.format(controller._action))
-                elif action == 'S':
-                    yield from controller.stop()
-                    logger.info('drone stopped.')
-            else:
-                client.send({'Error': 'controller is stopped.'})
-        except RuntimeError:
-            pass
+            yield from do_action(action, args)
+        except RuntimeError as e:
+            logger.error('RuntimeError: {}'.format(e))
         except ValueError:
             logger.warning('wrong values')
         except KeyError:
@@ -109,17 +90,18 @@ def get_command(client, controller):
 
     logger.debug("control connection closed.")
 
-
 def run_server():
     global controller
     controller = Controller(rpi_drone, log=True)
     loop = asyncio.get_event_loop()
     s = Server('140.112.18.210', 12345)
-    cc = SocketClient(s)
-    # cc = ConsoleClient()
+    sclient = SocketClient(s)
+    # cclient = ConsoleClient()
     tasks = [
-        loop.create_task(cc.connect()),
-        loop.create_task(get_command(cc, controller)),
+        loop.create_task(sclient.connect()),
+        # loop.create_task(cclient.connect()),
+        loop.create_task(get_command(sclient, controller)),
+        loop.create_task(get_command(cclient, controller)),
         loop.create_task(start_control(controller)),
     ]
     try:
@@ -127,7 +109,8 @@ def run_server():
     except KeyboardInterrupt:
         logger.debug('capture ctrl-C in rpi main.')
         coros = [
-            cc.close(),
+            sclient.close(),
+            # cclient.close(),
             controller.stop(),
             rpi_drone.stop(),
             asyncio.wait(tasks),
