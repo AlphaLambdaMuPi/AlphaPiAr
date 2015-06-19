@@ -26,7 +26,7 @@ void setup() {
   mpu6050.initialize();
   /* Serial.println(mpu6050.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed"); */
   
-  mpu6050.setDLPFMode(3); // 3 : 40Hz
+  mpu6050.setDLPFMode(4); // 4 : 20Hz
   mpu6050.setI2CBypassEnabled(true);
   mpu6050.setI2CMasterModeEnabled(false);
 
