@@ -33,13 +33,13 @@ class Controller(object):
         # self.theta_mom = Momentum()
         # self.omega_mom = Momentum()
 
-        self._pid_thetaxy = np.array([56., 10., 32.])
+        self._pid_thetaxy = np.array([40., 15., 25.])
         self._pid_tweakper = np.array([1., 1., 1.])
 
         self._pids = {
-                'theta_x': PID(*self._pid_thetaxy, imax=50.),
-                'theta_y': PID(*self._pid_thetaxy, imax=50.),
-                'omega_z': PID(40., 5., 0., imax=40.),
+                'theta_x': PID(*self._pid_thetaxy, imax=60.),
+                'theta_y': PID(*self._pid_thetaxy, imax=60.),
+                'theta_z': PID(40., 10., 20., imax=40.),
             }
 
         # logging
@@ -126,15 +126,15 @@ class Controller(object):
         for i in range(3):
             theome = np.array([theta[i], omega[i]])
             self._kf[i].update(now, theome)
-            res = self._kf[i].predict(now)
-            theta_smooth.append(res[0])
-            omega_smooth.append(res[1])
+            the, ome = self._kf[i].predict(now)
+            theta_smooth.append(the)
+            omega_smooth.append(ome)
         theta_smooth = np.array(theta_smooth)
         omega_smooth = np.array(omega_smooth)
         # theta_smooth = self.theta_mom.append_value(now, theta)
         # omega_smooth = self.omega_mom.append_value(now, omega)
         thetaxy_error = self._target_angle - theta_smooth[0:2]
-        omegaz_error  = 0                  - omega_smooth[2]
+        thetaz_error  = 0                  - theta_smooth[2]
 
         theta_x_action = self._pids['theta_x'].get_control(
                 now, thetaxy_error[0], 0 - omega_smooth[0]
@@ -142,14 +142,14 @@ class Controller(object):
         theta_y_action = self._pids['theta_y'].get_control(
                 now, thetaxy_error[1], 0 - omega_smooth[1]
             )
-        omega_z_action = self._pids['omega_z'].get_control(
-                now, omegaz_error
+        theta_z_action = self._pids['theta_z'].get_control(
+                now, thetaz_error, 0 - omega_smooth[2]
             )
 
-        self._action[0] = -theta_y_action +  omega_z_action
-        self._action[1] =  theta_x_action + -omega_z_action
-        self._action[2] =  theta_y_action +  omega_z_action
-        self._action[3] = -theta_x_action + -omega_z_action
+        self._action[0] = -theta_y_action +  theta_z_action
+        self._action[1] =  theta_x_action + -theta_z_action
+        self._action[2] =  theta_y_action +  theta_z_action
+        self._action[3] = -theta_x_action + -theta_z_action
 
         logger.debug('{}'.format(self._action))
 
@@ -179,7 +179,9 @@ class Controller(object):
         else:
             final_action = np.full((4, ), -100.)
 
-        # final_action[0] = final_action[2] = -100.
+        final_action[1] += 4
+        final_action[2] += 10
+        # final_action[1] = final_action[3] = -100.
         yield from self._drone.set_motors(final_action)
 
     @asyncio.coroutine
