@@ -137,14 +137,14 @@ class Controller(object):
         thetaz_error  = 0                  - theta_smooth[2]
 
         theta_x_action = self._pids['theta_x'].get_control(
-                now, thetaxy_error[0], 0 - omega_smooth[0]
-            )
+            now, thetaxy_error[0], 0 - omega_smooth[0]
+        )
         theta_y_action = self._pids['theta_y'].get_control(
-                now, thetaxy_error[1], 0 - omega_smooth[1]
-            )
+            now, thetaxy_error[1], 0 - omega_smooth[1]
+        )
         theta_z_action = self._pids['theta_z'].get_control(
-                now, thetaz_error, 0 - omega_smooth[2]
-            )
+            now, thetaz_error, 0 - omega_smooth[2]
+        )
 
         self._action[0] = -theta_y_action +  theta_z_action
         self._action[1] =  theta_x_action + -theta_z_action
@@ -173,9 +173,11 @@ class Controller(object):
     def send_control(self):
         if self._thrust >= 10:
             final_action = self._action + self._thrust
-            final_action = np.maximum.reduce([final_action, np.full((4,), -100)])
-            final_action = np.minimum.reduce([final_action,
-                                        np.full((4,), self._restriction)])
+            final_action = np.maximum.reduce([final_action,
+                                              np.full((4,), -100)])
+            final_action = np.minimum.reduce(
+                [final_action, np.full((4,), self._restriction)]
+            )
         else:
             final_action = np.full((4, ), -100.)
 

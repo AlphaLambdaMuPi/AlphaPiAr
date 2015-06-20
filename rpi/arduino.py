@@ -7,6 +7,7 @@ import json
 import random
 import struct
 import serial
+import time
 import numpy as np
 
 logger = logging.getLogger()
@@ -26,12 +27,14 @@ class Arduino(object):
             fut, s = self._waitings.get_nowait()
             while fut.done():
                 fut, s = self._waitings.get_nowait()
+            res = self._ser.read(s)
+            fut.set_result(res)
         except asyncio.QueueEmpty:
             res = self._ser.read(self._ser.inWaiting())
             logger.error('arduino yapsilon!!!! {}'.format(res))
-        else:
-            res = self._ser.read(s)
-            fut.set_result(res)
+        except KeyboardInterrupt:
+            logger.warning('reading from arduino was cancelled by Ctrl-C.')
+            fut.set_result(False)
 
     @asyncio.coroutine
     def communicate(self, cmd, size=None):
@@ -104,6 +107,10 @@ class Arduino(object):
         '''
         decode sensors data from bytes to dict.
         '''
+        
+        if not b:
+            return None
+
         res = []
         retsize = [
             ('accel', 3),
@@ -156,17 +163,15 @@ class Arduino(object):
         res = yield from self.communicate(st, 1)
         if res != b'm':
             logger.error('Write motor to Arduino failed !!!')
-        else:
-            # logger.debug('motors writed.')
-            pass
 
     def alive(self):
-        return self.state != 'FAILED'
+        return self.state != 'FAILED' and self.state != 'CLOSED'
 
     def close(self):
-        self._ser.flush()
-        self._ser.close()
-        self.state = 'CLOSED'
+        if self.state != 'CLOSED':
+            self._ser.flush()
+            self._ser.close()
+            self.state = 'CLOSED'
 
 
 # use in arduino mode
