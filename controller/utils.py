@@ -24,4 +24,25 @@ class Momentum:
 
         return self._value
         
+class Angle:
+    def __init__(self, theta=0):
+        self._theta = theta % 360.
+
+    @property
+    def theta(self):
+        return self._theta
+
+    @theta.setter
+    def theta(self, t):
+        self._theta = t
+
+    def __float__(self):
+        return self._theta % 360. - 180.
+
+    def __add__(self, t):
+        return Angle(self.theta + t.theta)
+
+    def __minus__(self, t):
+        return Angle(self.theta - t.theta)
+        
         
