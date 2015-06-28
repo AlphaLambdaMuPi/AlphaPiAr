@@ -55,6 +55,11 @@ void swf(float f) //serial write float
   Serial.write((char*)&f, 4);
 }
 
+void sws(short s) //serial write short
+{
+  Serial.write((char*)&s, 2);
+}
+
 void srs(short &s) //serial read short
 {
   Serial.readBytes((char*)&s, 2);
@@ -75,8 +80,8 @@ Measure& read_data(bool prn=false)
 
   if(prn)
   {
-    swf(meas.accel.x); swf(meas.accel.y); swf(meas.accel.z);
-    swf(meas.gyro.x); swf(meas.gyro.y); swf(meas.gyro.z);
+    sws((short)ax); sws((short)ay); sws((short)az);
+    sws((short)gx); sws((short)gy); sws((short)gz);
   }
 
   hmc5883l.getHeading(&mx, &my, &mz);
@@ -88,7 +93,7 @@ Measure& read_data(bool prn=false)
 
   if(prn)
   {
-    swf(meas.mag.x); swf(meas.mag.y); swf(meas.mag.z);
+    sws((short)mx); sws((short)my); sws((short)mz);
   }
 
   if(micros() - lastMicros > bmp085.getMeasureDelayMicroseconds())

@@ -103,6 +103,16 @@ class Arduino(object):
             return False
         return True
 
+    def convert_sensors(self, data):
+        data['accel'] = list(map(lambda x: x * 2 * 9.8 / 32768. ), data['accel'])
+        data['gyro'] = list(map(lambda x: x * np.pi / 180 * 250 / 32768. ), data['gyro'])
+        mag_norm = np.linalg.norm(data['mag'])
+        data['mag'] = list(map(lambda x: x / mag_norm ), data['mag'])
+        volrate = 0.9755
+        ret['voltage'] *= volrate * 10.16
+        ret['current'] = volrate * ret['current'] * 16.6 + 0.73
+        return data
+
     def decode_sensors(self, b):
         '''
         decode sensors data from bytes to dict.
@@ -113,29 +123,32 @@ class Arduino(object):
 
         res = []
         retsize = [
-            ('accel', 3),
-            ('gyro', 3),
-            ('mag', 3),
-            ('temperature', 1),
-            ('pressure', 1),
-            ('voltage', 1),
-            ('current', 1),
+            ('accel', 's', 3),
+            ('gyro', 's', 3),
+            ('mag', 's', 3),
+            ('temperature', 'f', 1),
+            ('pressure', 'f', 1),
+            ('voltage', 'f', 1),
+            ('current', 'f', 1),
         ]
         ret = {}
         ret['time'] = self._loop.time()
         scnt = 0
-        for t, s in retsize:
-            ret[t] = list(struct.unpack('f'*s, b[4*scnt:4*(scnt+s)]))
+        for t, c, s in retsize:
+            if c == 's':
+                byte = s * 2
+            elif c == 'f':
+                byte = s * 4
+            ret[t] = list(struct.unpack(c*s, b[scnt:(scnt+byte)]))
             if len(ret[t]) == 1:
                 ret[t] = ret[t][0]
-            scnt += s
+            scnt += byte
+
+        ret = self.convert_sensors(ret)
 
         if not self.verify_sensors(ret):
             return None
 
-        volrate = 0.9755
-        ret['voltage'] *= volrate * 10.16
-        ret['current'] = volrate * ret['current'] * 16.6 + 0.73
 
         return ret
 
@@ -145,9 +158,10 @@ class Arduino(object):
         read sensors from arduino.
         '''
         # ax, ay, az, gx, gy, gz, mx, my, mz, temp, pres
+        #  2,  2,  2,  2,  2,  2,  2,  2,  2,    4,    4  = 26 
         data = None
         while data is None:
-            data = yield from self.communicate(b'R', 4*13)
+            data = yield from self.communicate(b'R', 2*9 + 4*2)
             data = self.decode_sensors(data)
         return data
 
