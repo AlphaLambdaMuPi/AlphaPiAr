@@ -8,6 +8,7 @@ import numpy as np
 from .pid import PID
 from .utils import Momentum
 from .kalfil import ThetaOmegaKalmanFilter
+from .constant import CONST
 
 logger = logging.getLogger()
 
@@ -15,6 +16,8 @@ class Controller(object):
     def __init__(self, drone, *, loop=None, log=False):
         if not loop:
             loop = asyncio.get_event_loop()
+        self._armed = False
+        self._landing = True
         self._loop = loop
         self._drone = drone
         self._kf = []
@@ -24,7 +27,6 @@ class Controller(object):
         self._thrust = 0
         self._target_angle = np.array([0., 0.])
 
-        self._stablized = asyncio.Future(loop=self._loop)
         self.stop_signal = False
         self.stopped = asyncio.Future(loop=self._loop)
 
@@ -60,9 +62,13 @@ class Controller(object):
         return self._despos
 
     def set_thrust(self, thrust):
+        if not self._armed:
+            return
         self._thrust = thrust
 
     def set_angle(self, angle_x, angle_y):
+        if not self._armed:
+            return
         self._target_angle = np.array([angle_x, angle_y])
 
     def tweak_pid(self, type_, per):
@@ -99,15 +105,10 @@ class Controller(object):
         DTIME = 20e-3
         self._last_time = self._loop.time()
 
-        logger.info('wait for taking off.')
-        res = yield from self._stablized
-        if not res:
-            return
-        logger.info('took off and stablized.')
-
         while self._drone.alive() and not self.stop_signal:
-            yield from asyncio.sleep(0.)
-            yield from self.update()
+            if self._armed:
+                yield from self.update()
+                yield from asyncio.sleep(0.)
 
     @asyncio.coroutine
     def update(self):
@@ -190,41 +191,41 @@ class Controller(object):
     def takeoff(self):
         # TODO:
         # implement take off process and check if drone is stable.
-        if self.stopped.done():
-            return False
-        if self._stablized.done():
-            raise RuntimeError('the drone has already took off.')
-        self._stablized.set_result(True)
         return True
+
+    @asyncio.coroutine
+    def arm(self):
+        self._armed = True
+        self._thrust = CONST['armed_thrust']
+        yield from self.send_control()
+        return True
+
+    @asyncio.coroutine
+    def disarm(self):
+        self._armed = False
+        self._landing = True
+        self.set_angle(0, 0)
+        yield from self.landing()
+        return True
+
 
     @asyncio.coroutine
     def landing(self):
         logger.info('landing...')
 
-        '''
-        motor = min(self._action)
-        self._action = np.full((4,), motor)
+        # Land at speed 400 thrust per second
+        while not self.stop_signal and self._thrust > 0:
+            self._thrust -= 20
+            yield from self._drone.send_control()
+            yield from asyncio.sleep(.05)
 
-        while motor > 0:
-        self._action -= 50
-        yield from self.send_control()
-        motor -= 50
-
-        '''
-
-        # for testing
-        self._action = np.full((4,), -100)
-        yield from self._drone.set_motors(self._action)
-
+        self._thrust = -100
+        self._landing = True
         logger.info('landed.')
 
-        self.stopped.set_result(True)
 
     @asyncio.coroutine
     def stop(self):
-        if not self._stablized.done():
-            self._stablized.set_result(False)
-
         self.stop_signal = True
         yield from self.stopped
 

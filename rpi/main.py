@@ -35,15 +35,17 @@ def start_control(controller):
 @asyncio.coroutine
 def do_action(action, args):
     if not controller.stop_signal:
-        if action == 'T':
-            ret = yield from controller.takeoff()
+        if action == 'arm':
+            ret = yield from controller.arm()
         elif action == 'thrust':
             controller.set_thrust(*args)
         elif action == 'angle':
             controller.set_angle(*args)
         elif action == 'tweak':
             controller.tweak_pid(*args)
-        elif action == 'S':
+        elif action == 'disarm':
+            ret = yield from controller.disarm()
+        elif action == 'stop':
             yield from controller.stop()
             logger.info('drone stopped.')
     else:
