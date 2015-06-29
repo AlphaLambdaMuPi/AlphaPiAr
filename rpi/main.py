@@ -35,6 +35,7 @@ def start_control(controller):
 @asyncio.coroutine
 def do_action(action, args):
     if not controller.stop_signal:
+        print(action)
         yield from controller.preform_action(action, args)
         #if action == 'arm':
             #ret = yield from controller.arm()
@@ -77,6 +78,7 @@ def get_command(client, controller):
         if not data:
             continue
         # parse four number for motors control
+        print(data)
         try:
             action = data['action']
             args = data['args']

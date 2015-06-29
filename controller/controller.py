@@ -25,7 +25,7 @@ class Controller(object):
             self._kf.append(ThetaOmegaKalmanFilter(0.1, 0.1, 0.04))
         self._action = np.array([0., 0., 0., 0.])
         self._thrust = 0
-        self._target_angle = np.array([0., 0.])
+        self._target_angle = np.array([0., 0., 0.])
 
         self.stop_signal = False
         self.stopped = asyncio.Future(loop=self._loop)
@@ -75,10 +75,10 @@ class Controller(object):
 
     def get_control(self, thrust, angle_x, angle_y, omega_z):
         if not self._armed or self.stop_signal:
-            self.thrust = -100
+            self._thrust = -100
             return
 
-        if self.thrust > 0:
+        if self._thrust > CONST['armed_thrust']:
             dx = CONST['max_thrust'] - CONST['armed_thrust']
         else:
             dx = CONST['armed_thrust'] - CONST['disarmed_thrust']
@@ -114,7 +114,8 @@ class Controller(object):
         while self._drone.alive() and not self.stop_signal:
             if self._armed:
                 yield from self.update()
-                yield from asyncio.sleep(0.)
+            yield from asyncio.sleep(0.)
+
 
     @asyncio.coroutine
     def update(self):
@@ -159,7 +160,7 @@ class Controller(object):
         self._action[2] =  theta_y_action +  theta_z_action
         self._action[3] = -theta_x_action + -theta_z_action
 
-        logger.debug('{}'.format(self._action))
+        # logger.debug('{}'.format(self._action))
 
         yield from self.send_control()
 
@@ -192,6 +193,7 @@ class Controller(object):
         final_action[1] += 4
         final_action[2] += 10
         # final_action[1] = final_action[3] = -100.
+        print(final_action)
         yield from self._drone.set_motors(final_action)
 
     @asyncio.coroutine
@@ -211,7 +213,7 @@ class Controller(object):
     def disarm(self):
         self._armed = False
         self._landing = True
-        self.set_angle(0, 0)
+        self._target_angle = np.array([0., 0., 0.])
         yield from self.landing()
         return True
 
@@ -223,24 +225,31 @@ class Controller(object):
         # Land at speed 400 thrust per second
         while not self.stop_signal and self._thrust > 0:
             self._thrust -= 20
-            yield from self._drone.send_control()
+            yield from self.send_control()
             yield from asyncio.sleep(.05)
 
         self._thrust = -100
         self._landing = True
         logger.info('landed.')
 
+    @asyncio.coroutine
+    def stall(self):
+        self._thrust = -100
+        yield from self.send_control()
+
 
     @asyncio.coroutine
     def stop(self):
         self.stop_signal = True
+        yield from self.stall()
         yield from self.stopped
 
     @asyncio.coroutine
     def preform_action(self, action, args):
-        if action == 'stop'
-            self.stop()
+        if action == 'stop':
+            yield from self.stop()
         elif action == 'arm':
+            print('Get Arm')
             yield from self.arm()
         elif action == 'disarm':
             yield from self.disarm()
