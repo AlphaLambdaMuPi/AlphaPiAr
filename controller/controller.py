@@ -61,16 +61,6 @@ class Controller(object):
     def get_despos(self):
         return self._despos
 
-    def set_thrust(self, thrust):
-        if not self._armed:
-            return
-        self._thrust = thrust
-
-    def set_angle(self, angle_x, angle_y):
-        if not self._armed:
-            return
-        self._target_angle = np.array([angle_x, angle_y])
-
     def tweak_pid(self, type_, per):
         if type_ == 'P':
             self._pid_tweakper[0] = per
@@ -82,6 +72,22 @@ class Controller(object):
         print(gain)
         self._pids['theta_x'].set_gain(*gain)
         self._pids['theta_y'].set_gain(*gain)
+
+    def get_control(self, thrust, angle_x, angle_y, omega_z):
+        if not self._armed or self.stop_signal:
+            self.thrust = -100
+            return
+
+        if self.thrust > 0:
+            dx = CONST['max_thrust'] - CONST['armed_thrust']
+        else:
+            dx = CONST['armed_thrust'] - CONST['disarmed_thrust']
+        self._thrust = thrust * dx + CONST['armed_thrust']
+
+        mxy, mz = CONST['max_anglexy'], CONST['max_anglez']
+        self._target_angle = np.array([angle_x*mxy, angle_y*mxy, omega_z*mz])
+        
+        
 
     @asyncio.coroutine
     def run(self):
@@ -134,17 +140,18 @@ class Controller(object):
         omega_smooth = np.array(omega_smooth)
         # theta_smooth = self.theta_mom.append_value(now, theta)
         # omega_smooth = self.omega_mom.append_value(now, omega)
-        thetaxy_error = self._target_angle - theta_smooth[0:2]
-        thetaz_error  = 0                  - theta_smooth[2]
+        #thetaxy_error = self._target_angle - theta_smooth[0:2]
+        #thetaz_error  = 0                  - theta_smooth[2]
+        theta_error    = self._target_angle - theta_smooth
 
         theta_x_action = self._pids['theta_x'].get_control(
-            now, thetaxy_error[0], 0 - omega_smooth[0]
+            now, theta_error[0], 0 - omega_smooth[0]
         )
         theta_y_action = self._pids['theta_y'].get_control(
-            now, thetaxy_error[1], 0 - omega_smooth[1]
+            now, theta_error[1], 0 - omega_smooth[1]
         )
         theta_z_action = self._pids['theta_z'].get_control(
-            now, thetaz_error, 0 - omega_smooth[2]
+            now, theta_error[2], 0 - omega_smooth[2]
         )
 
         self._action[0] = -theta_y_action +  theta_z_action
@@ -228,4 +235,19 @@ class Controller(object):
     def stop(self):
         self.stop_signal = True
         yield from self.stopped
+
+    @asyncio.coroutine
+    def preform_action(self, action, args):
+        if action == 'stop'
+            self.stop()
+        elif action == 'arm':
+            yield from self.arm()
+        elif action == 'disarm':
+            yield from self.disarm()
+        elif action == 'control':
+            self.get_control(*args)
+        elif action == 'tweak':
+            self.tweak_pid(*args)
+            
+
 
