@@ -104,13 +104,14 @@ class Arduino(object):
         return True
 
     def convert_sensors(self, data):
-        data['accel'] = list(map(lambda x: x * 2 * 9.8 / 32768. ), data['accel'])
-        data['gyro'] = list(map(lambda x: x * np.pi / 180 * 250 / 32768. ), data['gyro'])
+        data['accel'] = list(map(lambda x: x * 2 * 9.8 / 32768. , data['accel']))
+        data['gyro'] = list(map(lambda x: x * np.pi / 180 * 250 / 32768. ,
+                                data['gyro']))
         mag_norm = np.linalg.norm(data['mag'])
-        data['mag'] = list(map(lambda x: x / mag_norm ), data['mag'])
+        data['mag'] = list(map(lambda x: x / mag_norm , data['mag']))
         volrate = 0.9755
-        ret['voltage'] *= volrate * 10.16
-        ret['current'] = volrate * ret['current'] * 16.6 + 0.73
+        data['voltage'] *= volrate * 10.16
+        data['current'] = volrate * data['current'] * 16.6 + 0.73
         return data
 
     def decode_sensors(self, b):
@@ -123,9 +124,9 @@ class Arduino(object):
 
         res = []
         retsize = [
-            ('accel', 's', 3),
-            ('gyro', 's', 3),
-            ('mag', 's', 3),
+            ('accel', 'h', 3),
+            ('gyro', 'h', 3),
+            ('mag', 'h', 3),
             ('temperature', 'f', 1),
             ('pressure', 'f', 1),
             ('voltage', 'f', 1),
@@ -135,7 +136,7 @@ class Arduino(object):
         ret['time'] = self._loop.time()
         scnt = 0
         for t, c, s in retsize:
-            if c == 's':
+            if c == 'h':
                 byte = s * 2
             elif c == 'f':
                 byte = s * 4
@@ -157,11 +158,11 @@ class Arduino(object):
         '''
         read sensors from arduino.
         '''
-        # ax, ay, az, gx, gy, gz, mx, my, mz, temp, pres
-        #  2,  2,  2,  2,  2,  2,  2,  2,  2,    4,    4  = 26 
+        # ax, ay, az, gx, gy, gz, mx, my, mz, temp, pres, voltage, current
+        #  2,  2,  2,  2,  2,  2,  2,  2,  2,    4,    4,       4,       4 = 34 
         data = None
         while data is None:
-            data = yield from self.communicate(b'R', 2*9 + 4*2)
+            data = yield from self.communicate(b'R', 2*9 + 4*4)
             data = self.decode_sensors(data)
         return data
 
