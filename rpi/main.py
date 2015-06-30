@@ -35,17 +35,21 @@ def start_control(controller):
 @asyncio.coroutine
 def do_action(action, args):
     if not controller.stop_signal:
-        if action == 'T':
-            ret = yield from controller.takeoff()
-        elif action == 'thrust':
-            controller.set_thrust(*args)
-        elif action == 'angle':
-            controller.set_angle(*args)
-        elif action == 'tweak':
-            controller.tweak_pid(*args)
-        elif action == 'S':
-            yield from controller.stop()
-            logger.info('drone stopped.')
+        print(action)
+        yield from controller.preform_action(action, args)
+        #if action == 'arm':
+            #ret = yield from controller.arm()
+        #elif action == 'thrust':
+            #controller.set_thrust(*args)
+        #elif action == 'angle':
+            #controller.set_angle(*args)
+        #elif action == 'tweak':
+            #controller.tweak_pid(*args)
+        #elif action == 'disarm':
+            #ret = yield from controller.disarm()
+        #elif action == 'stop':
+            #yield from controller.stop()
+            #logger.info('drone stopped.')
     else:
         pass
         # client.send({'Error': 'controller is stopped.'})
@@ -74,6 +78,7 @@ def get_command(client, controller):
         if not data:
             continue
         # parse four number for motors control
+        print(data)
         try:
             action = data['action']
             args = data['args']
