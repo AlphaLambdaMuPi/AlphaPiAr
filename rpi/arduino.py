@@ -153,17 +153,88 @@ class Arduino(object):
 
         return ret
 
+    def unpack_data(self, b, retsize):
+        ret = {}
+        ret['time'] = self._loop.time()
+        scnt = 0
+        for t, c, s in retsize:
+            if c == 'h':
+                byte = s * 2
+            elif c == 'f':
+                byte = s * 4
+            ret[t] = list(struct.unpack(c*s, b[scnt:(scnt+byte)]))
+            if len(ret[t]) == 1:
+                ret[t] = ret[t][0]
+            scnt += byte
+        return ret
+        
+
     @asyncio.coroutine
-    def read_sensors(self):
+    def read_motion_sensors(self):
         '''
         read sensors from arduino.
         '''
-        # ax, ay, az, gx, gy, gz, mx, my, mz, temp, pres, voltage, current
-        #  2,  2,  2,  2,  2,  2,  2,  2,  2,    4,    4,       4,       4 = 34 
+        # ax, ay, az, gx, gy, gz, mx, my, mz
+        #  2,  2,  2,  2,  2,  2,  2,  2,  2 = 18
         data = None
         while data is None:
-            data = yield from self.communicate(b'R', 2*9 + 4*4)
-            data = self.decode_sensors(data)
+            data = yield from self.communicate(b'R', 2*9)
+
+        retsize = [
+            ('accel', 'h', 3),
+            ('gyro', 'h', 3),
+            ('mag', 'h', 3),
+        ]
+        data = self.unpack_data(data, retsize)
+        data['accel'] = list(map(lambda x: x * 2 * 9.8 / 32768. , data['accel']))
+        data['gyro'] = list(map(lambda x: x * np.pi / 180 * 250 / 32768. ,
+                                data['gyro']))
+        mag_norm = np.linalg.norm(data['mag'])
+        data['mag'] = list(map(lambda x: x / mag_norm , data['mag']))
+
+        if (np.linalg.norm(data['accel']) > 100 
+                or np.linalg.norm(data['gyro']) > 100 
+                or np.linalg.norm(mag) > 1.1 
+                or np.linalg.norm(mag) < 0.9):
+            return None
+        return data
+
+    @asyncio.coroutine
+    def read_weather_sensors(self):
+        '''
+        temp, pres
+           4,    4 = 
+        '''
+        data = None
+        while data is None:
+            data = yield from self.communicate(b'W', 4*2)
+        retsize = [
+            ('temperature', 'f', 1),
+            ('pressure', 'f', 1),
+        ]
+        data = self.unpack_data(data, retsize)
+        if (data['temperature'] < 0 or data['temperature'] > 45
+            or data['pressure'] < 90000 or data['pressure'] > 110000):
+            return None
+        return data
+
+    @asyncio.coroutine
+    def read_voltage_sensors(self):
+        '''
+        temp, pres, voltage, current
+           4,    4,       4,       4 = 34        data = None
+        '''
+        data = None
+        while data is None:
+            data = yield from self.communicate(b'V', 4*2)
+        retsize = [
+            ('voltage', 'f', 1),
+            ('current', 'f', 1),
+        ]
+        data = self.unpack_data(data, retsize)
+        volrate = 0.9755
+        data['voltage'] *= volrate * 10.16
+        data['current'] = volrate * data['current'] * 16.6 + 0.73
         return data
 
     @asyncio.coroutine
@@ -206,7 +277,7 @@ def run_arduino():
                 res = []
                 TN = 100
                 for i in range(TN):
-                    s = yield from arduino.read_sensors()
+                    s = yield from arduino.read_motion_sensors()
                     res.append(s)
                 s = {}
                 for k in res[0]:
