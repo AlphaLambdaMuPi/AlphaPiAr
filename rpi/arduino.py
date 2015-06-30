@@ -238,6 +238,12 @@ class Arduino(object):
         return data
 
     @asyncio.coroutine
+    def read_weather_sensors(self):
+
+    @asyncio.coroutine
+    def read_voltage_sensors(self):
+
+    @asyncio.coroutine
     def write_motors(self, motors):
         '''
         send control signals to drone's motors via arduino.
