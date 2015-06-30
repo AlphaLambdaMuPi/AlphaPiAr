@@ -76,9 +76,9 @@ void read_motion_data()
   sws((short)mx); sws((short)my); sws((short)mz);
 }
 
+float temperature = 30.0, pressure = 100000.0;
 void read_weather_data() 
 {
-  float temperature, pressure;
   if(micros() - lastMicros > bmp085.getMeasureDelayMicroseconds())
   {
     if(bmp085.getControl() == 10)
