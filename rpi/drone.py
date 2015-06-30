@@ -29,8 +29,11 @@ class Drone(object):
         pressures = []
         mags = []
         while t < TEST_COUNT:
-            s = yield from self.arduino.read_sensors()
             t += 1
+            s = {}
+            s.update((yield from self.arduino.read_weather_sensors()))
+            s.update((yield from self.arduino.read_motion_sensors()))
+            s.update((yield from self.arduino.read_voltage_sensors()))
             self.data = s
             volt = self.data['voltage']
             acc = list(self.data['accel'])
@@ -92,6 +95,7 @@ class Drone(object):
         return self.data['gyro'] - self.omega0
 
     def getz(self):
+        return 123
         return (self.p0 - self.data['pressure']) * 0.083
 
     def gettheta(self):
@@ -110,8 +114,8 @@ class Drone(object):
 
     
     @asyncio.coroutine
-    def get_sensors(self):
-        self.data = yield from self.arduino.read_sensors()
+    def get_motion_sensors(self):
+        self.data = yield from self.arduino.read_motion_sensors()
         # logger.debug('{}'.format(self.data))
         return self.getacc(), self.getomega(), self.getz()
 
