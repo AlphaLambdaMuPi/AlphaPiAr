@@ -194,8 +194,8 @@ class Arduino(object):
 
         if (np.linalg.norm(data['accel']) > 100 
                 or np.linalg.norm(data['gyro']) > 100 
-                or np.linalg.norm(mag) > 1.1 
-                or np.linalg.norm(mag) < 0.9):
+                or np.linalg.norm(data['mag']) > 1.1 
+                or np.linalg.norm(data['mag']) < 0.9):
             return None
         return data
 
@@ -279,11 +279,16 @@ def run_arduino():
         yield from loop.connect_read_pipe(lambda: reader_protocol, sys.stdin)
         while True:
             data = (yield from reader.readline()).decode().strip()
-            if data == 'R':
+            if data == 'R' or data=='W' or data=='V':
                 res = []
                 TN = 100
                 for i in range(TN):
-                    s = yield from arduino.read_motion_sensors()
+                    if data == 'R':
+                        s = yield from arduino.read_motion_sensors()
+                    elif data == 'W':
+                        s = yield from arduino.read_weather_sensors()
+                    else: 
+                        s = yield from arduino.read_voltage_sensors()
                     res.append(s)
                 s = {}
                 for k in res[0]:

@@ -126,7 +126,7 @@ class Controller(object):
         now = self._loop.time()
         dt = now - self._last_time
 
-        acc, omega, z = yield from self._drone.get_sensors()
+        acc, omega, z = yield from self._drone.get_motion_sensors()
         theta = self._drone.gettheta()
 
         theta_smooth = []
@@ -160,7 +160,7 @@ class Controller(object):
         self._action[2] =  theta_y_action +  theta_z_action
         self._action[3] = -theta_x_action + -theta_z_action
 
-        # logger.debug('{}'.format(self._action))
+        logger.debug('{}'.format(self._action))
 
         yield from self.send_control()
 

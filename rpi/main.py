@@ -85,8 +85,8 @@ def get_command(client, controller):
             yield from do_action(action, args)
         except RuntimeError as e:
             logger.error('RuntimeError: {}'.format(e))
-        except ValueError:
-            logger.warning('wrong values')
+        except ValueError as e:
+            logger.warning('wrong values: {}'.format(e))
         except KeyError:
             client.send({'Error': 'wrong parameters'})
         except IndexError:
