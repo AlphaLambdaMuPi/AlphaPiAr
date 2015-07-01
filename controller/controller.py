@@ -73,16 +73,12 @@ class Controller(object):
         self._pids['theta_x'].set_gain(*gain)
         self._pids['theta_y'].set_gain(*gain)
 
-    def get_control(self, thrust, angle_x, angle_y, omega_z):
+    def get_control(self, thrust, tweak_thrust, angle_x, angle_y, omega_z):
         if not self._armed or self.stop_signal:
             self._thrust = -100
             return
 
-        if self._thrust > CONST['armed_thrust']:
-            dx = CONST['max_thrust'] - CONST['armed_thrust']
-        else:
-            dx = CONST['armed_thrust'] - CONST['disarmed_thrust']
-        self._thrust = thrust * dx + CONST['armed_thrust']
+        self._thrust = thrust + CONST['max_tweak_thrust'] * tweak_thrust
 
         mxy, mz = CONST['max_anglexy'], CONST['max_anglez']
         self._target_angle = np.array([angle_x*mxy, angle_y*mxy, 0])
