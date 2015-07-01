@@ -35,7 +35,7 @@ def start_control(controller):
 @asyncio.coroutine
 def do_action(action, args):
     if not controller.stop_signal:
-        print(action)
+        # print(action)
         yield from controller.preform_action(action, args)
     else:
         pass
@@ -73,8 +73,8 @@ def get_command(client, controller):
             yield from do_action(action, args)
         except RuntimeError as e:
             logger.error('RuntimeError: {}'.format(e))
-        except ValueError:
-            logger.warning('wrong values')
+        except ValueError as e:
+            logger.warning('wrong values: {}'.format(e))
         except KeyError:
             client.send({'Error': 'wrong parameters'})
         except IndexError:

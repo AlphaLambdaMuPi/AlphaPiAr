@@ -65,66 +65,42 @@ void srs(short &s) //serial read short
   Serial.readBytes((char*)&s, 2);
 }
 
-Measure& read_data(bool prn=false)
+void read_motion_data()
 {
   int16_t ax, ay, az, gx, gy, gz, mx, my, mz;
   mpu6050.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-  meas.accel.x = ax;
-  meas.accel.y = ay;
-  meas.accel.z = az;
-  meas.accel *= 9.8 * 2 / 32768;
-  meas.gyro.x = gx;
-  meas.gyro.y = gy;
-  meas.gyro.z = gz;
-  meas.gyro *= 3.14159265 / 180 * 250 / 32768;
-
-  if(prn)
-  {
-    sws((short)ax); sws((short)ay); sws((short)az);
-    sws((short)gx); sws((short)gy); sws((short)gz);
-  }
-
   hmc5883l.getHeading(&mx, &my, &mz);
 
-  meas.mag.x = mx;
-  meas.mag.y = my;
-  meas.mag.z = mz;
-  meas.mag *= 1 / meas.mag.len();
+  sws((short)ax); sws((short)ay); sws((short)az);
+  sws((short)gx); sws((short)gy); sws((short)gz);
+  sws((short)mx); sws((short)my); sws((short)mz);
+}
 
-  if(prn)
-  {
-    sws((short)mx); sws((short)my); sws((short)mz);
-  }
-
+float temperature = 30.0, pressure = 100000.0;
+void read_weather_data() 
+{
   if(micros() - lastMicros > bmp085.getMeasureDelayMicroseconds())
   {
     if(bmp085.getControl() == 10)
     {
-      meas.temperature = bmp085.getTemperatureC();
+      temperature = bmp085.getTemperatureC();
       bmp085.setControl(BMP085_MODE_PRESSURE_3);
     }
     else
     {
-      meas.pressure = bmp085.getPressure();
+      pressure = bmp085.getPressure();
       bmp085.setControl(BMP085_MODE_TEMPERATURE);
     }
     lastMicros = micros();
   }
+  swf(temperature); swf(pressure);
+}
 
-  if(prn)
-  {
-    swf(meas.temperature); swf(meas.pressure);
-  }
-
+void read_voltage_data()
+{
   float voltage = analogRead(1) * 5. / 1024.;
   float current = analogRead(2) * 5. / 1024.;
-  
-  if(prn)
-  {
-    swf(voltage); swf(current);
-  }
-
-  return meas;
+  swf(voltage); swf(current);
 }
 
 void set_motor()
@@ -140,12 +116,9 @@ void loop()
   if(!Serial.available()) return;
   int c = Serial.read();
 
-  if(c == 'R')
-  {
-    Measure &ms = read_data(true);
-  }
-  else if(c == 'M')
-  {
+  if(c == 'R') {
+    read_motion_data();
+  } else if(c == 'M') {
     for(int i=0; i<4; i++)
     {
       srs(motor[i]);
@@ -154,9 +127,11 @@ void loop()
     }
     set_motor();
     Serial.write('m');
-  }
-  else if(c == 'S')
-  {
+  } else if (c == 'W') {
+    read_weather_data();
+  } else if (c == 'V') {
+    read_voltage_data();
+  } else if (c == 'S') {
     Serial.write('s');
   }
 }
