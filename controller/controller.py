@@ -4,6 +4,7 @@ import asyncio
 import logging
 import json
 import numpy as np
+import time
 
 from .pid import PID
 from .utils import Momentum
@@ -35,13 +36,13 @@ class Controller(object):
         # self.theta_mom = Momentum()
         # self.omega_mom = Momentum()
 
-        self._pid_thetaxy = np.array([40., 15., 25.])
+        self._pid_thetaxy = np.array([50., 15., 30.])
         self._pid_tweakper = np.array([1., 1., 1.])
 
         self._pids = {
                 'theta_x': PID(*self._pid_thetaxy, imax=60.),
                 'theta_y': PID(*self._pid_thetaxy, imax=60.),
-                'theta_z': PID(40., 10., 20., imax=40.),
+                'theta_z': PID(20., 5., 10., imax=20.),
             }
 
         # logging
@@ -69,7 +70,6 @@ class Controller(object):
         elif type_ == 'D':
             self._pid_tweakper[2] = per
         gain = self._pid_thetaxy * self._pid_tweakper
-        print(gain)
         self._pids['theta_x'].set_gain(*gain)
         self._pids['theta_y'].set_gain(*gain)
 
@@ -85,7 +85,7 @@ class Controller(object):
         self._thrust = thrust * dx + CONST['armed_thrust']
 
         mxy, mz = CONST['max_anglexy'], CONST['max_anglez']
-        self._target_angle = np.array([angle_x*mxy, angle_y*mxy, omega_z*mz])
+        self._target_angle = np.array([angle_x*mxy, angle_y*mxy, 0])
         
         
 
@@ -121,7 +121,10 @@ class Controller(object):
     def update(self):
         '''updates the motors according to the sensors' data
         '''
+        # a = self._loop.time()
         if self._thrust < 10:
+            self._action = np.array([-100, -100, -100, -100])
+            yield from self.send_control()
             return
         now = self._loop.time()
         dt = now - self._last_time
@@ -160,7 +163,7 @@ class Controller(object):
         self._action[2] =  theta_y_action +  theta_z_action
         self._action[3] = -theta_x_action + -theta_z_action
 
-        logger.debug('{}'.format(self._action))
+        # logger.debug('{}'.format(self._action))
 
         yield from self.send_control()
 
@@ -175,8 +178,9 @@ class Controller(object):
                 'omega': omega.tolist(),
                 'theta_smooth': theta_smooth.tolist(),
                 'omega_smooth': omega_smooth.tolist(),
-                'time': now,
+                'time': time.time(),
             }))
+        # print(self._loop.time() - a)
 
     @asyncio.coroutine
     def send_control(self):
@@ -190,10 +194,13 @@ class Controller(object):
         else:
             final_action = np.full((4, ), -100.)
 
-        final_action[1] += 4
-        final_action[2] += 10
+        # final_action[0] -= 10
+        # final_action[1] += 4
+        # final_action[2] += 10
+        # final_action[3] -= 4
+        # final_action = np.full((4, ), -100.)
         # final_action[1] = final_action[3] = -100.
-        print(final_action)
+        # print(final_action)
         yield from self._drone.set_motors(final_action)
 
     @asyncio.coroutine
@@ -249,7 +256,6 @@ class Controller(object):
         if action == 'stop':
             yield from self.stop()
         elif action == 'arm':
-            print('Get Arm')
             yield from self.arm()
         elif action == 'disarm':
             yield from self.disarm()
