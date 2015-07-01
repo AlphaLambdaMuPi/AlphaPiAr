@@ -74,7 +74,13 @@ class Arduino(object):
         '''
         initialize the connection with arduino using serial
         '''
-        self._ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=3)
+        try:
+            self._ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=3)
+        except serial.serialutil.SerialException:
+            logger.error('Arduino was not connected to Rpi !!')
+            self.state = 'FAILED'
+            return
+
         self._loop.add_reader(self._ser.fileno(), self._get_data)
         logger.info('start setup...')
         while True:

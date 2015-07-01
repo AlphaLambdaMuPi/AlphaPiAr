@@ -18,10 +18,13 @@ class Client(object):
         self._conn = None
 
         self.connected = asyncio.Future(loop=self._loop)
-        self.alive = False
+        self.closed = False
 
     @asyncio.coroutine
     def connect(self):
+        if self.closed:
+            logger.warning('client was closed!')
+            return
         try:
             yield from self._connect()
         except (asyncio.CancelledError, KeyboardInterrupt):
@@ -29,13 +32,18 @@ class Client(object):
 
         if not self.connected.result():
             logger.warning('connection was cancelled or failed.')
-        self.alive = self.connected.result()
 
     def _connect(self):
         """classes inherits from this class should override this method to
         connect and set the result in self.connected.
         """
         self.connected.set_result(False)
+
+    @asyncio.coroutine
+    def reconnect(self):
+        yield from self._conn.close()
+        self.connected = asyncio.Future(loop=self._loop)
+        yield from self.connect()
 
     @asyncio.coroutine
     def recv(self):
@@ -45,11 +53,18 @@ class Client(object):
         return (yield from self._conn.recv())
 
     def send(self, data):
-        if self.connected.done():
-            self._conn.send(data)
-            return True
-        else:
-            return False
+        try:
+            if self.connected.done():
+                self._conn.send(data)
+                return True
+        except ConnectionError:
+            pass
+        return False
+
+    def alive(self):
+        if self._conn:
+            return self._conn.alive()
+        return False
 
     @asyncio.coroutine
     def close(self):
@@ -57,7 +72,7 @@ class Client(object):
             self.connected.cancel()
         elif self.connected.result():
             yield from self._conn.close()
-        self.alive = False
+        self.closed = True
 
 class SocketClient(Client):
     def __init__(self, server, *, loop=None):
